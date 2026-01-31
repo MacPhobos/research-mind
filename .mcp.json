@@ -3,11 +3,18 @@
     "mcp-vector-search": {
       "type": "stdio",
       "command": "mcp-vector-search",
-      "args": [
-        "mcp"
-      ],
+      "args": ["mcp"],
       "env": {
         "MCP_ENABLE_FILE_WATCHING": "true"
+      }
+    },
+    "kuzu-memory": {
+      "type": "stdio",
+      "command": "kuzu-memory",
+      "args": ["mcp"],
+      "env": {
+        "KUZU_MEMORY_PROJECT_ROOT": "/Users/mac/workspace/research-mind",
+        "KUZU_MEMORY_DB": "/Users/mac/workspace/research-mind/kuzu-memories"
       }
     }
   }
