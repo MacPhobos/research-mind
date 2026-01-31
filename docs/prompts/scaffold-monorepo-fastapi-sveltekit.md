@@ -558,6 +558,31 @@ def downgrade():
 
 ## Phase 4: UI Scaffolding ({FOO}-ui/)
 
+### 4.0 CRITICAL: SvelteKit Entry Points (Svelte 5)
+
+**⚠️ DO NOT CREATE:**
+
+- `src/main.ts` - SvelteKit handles component mounting internally
+- `index.html` at root - SvelteKit uses `src/app.html` instead
+- Raw Vite Svelte plugin - Use `@sveltejs/kit/vite` instead
+
+**Vite Config MUST be** (svelte.config.js or vite.config.ts):
+
+```typescript
+import { sveltekit } from "@sveltejs/kit/vite";
+
+export default {
+  plugins: [sveltekit()], // NOT svelte() plugin
+  // ... rest of config
+};
+```
+
+**Why?**
+
+- Svelte 4 used `new App()` pattern (no longer valid in Svelte 5)
+- SvelteKit 2.0+ with Svelte 5 uses `mount()` internally
+- The `@sveltejs/kit/vite` plugin handles all component lifecycle
+
 ### 4.1 Core Structure
 
 ```
@@ -609,14 +634,14 @@ def downgrade():
     "gen:api": "openapi-typescript $VITE_API_BASE_URL/openapi.json -o src/lib/api/generated.ts"
   },
   "dependencies": {
-    "svelte": "^4.2.0",
-    "@tanstack/svelte-query": "^5.28.0",
+    "svelte": "^5.0.0",
     "tailwindcss": "^3.4.0",
     "shadcn-svelte": "^0.7.0",
     "lucide-svelte": "^0.292.0",
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@sveltejs/kit": "^2.0.0",
     "@sveltejs/vite-plugin-svelte": "^3.0.0",
     "typescript": "^5.3.0",
     "vite": "^5.0.0",
@@ -641,19 +666,28 @@ VITE_API_BASE_URL=http://localhost:{SERVICE_PORT}
 
 ```svelte
 <script lang="ts">
-  import { useQuery } from '@tanstack/svelte-query';
+  import { onMount } from 'svelte';
   import ApiStatus from '$lib/components/ApiStatus.svelte';
   import { apiClient } from '$lib/api/client';
 
-  const versionQuery = useQuery({
-    queryKey: ['version'],
-    queryFn: () => apiClient.getVersion(),
+  let versionData = $state<any>(null);
+  let isLoading = $state(true);
+  let error = $state<Error | null>(null);
+
+  onMount(async () => {
+    try {
+      versionData = await apiClient.getVersion();
+    } catch (e) {
+      error = e as Error;
+    } finally {
+      isLoading = false;
+    }
   });
 </script>
 
 <main>
-  <h1>{{FOO}}</h1>
-  <ApiStatus query={$versionQuery} />
+  <h1>Research Mind</h1>
+  <ApiStatus {versionData} {isLoading} {error} />
 </main>
 ```
 
@@ -661,18 +695,24 @@ VITE_API_BASE_URL=http://localhost:{SERVICE_PORT}
 
 ```svelte
 <script lang="ts">
-  export let query;
+  interface Props {
+    versionData: any;
+    isLoading: boolean;
+    error: Error | null;
+  }
+
+  const { versionData, isLoading, error }: Props = $props();
 </script>
 
-{#if query.isLoading}
-  <p>Loading...</p>
-{:else if query.isError}
-  <p class="text-red-500">API Error: {query.error.message}</p>
-{:else if query.data}
+{#if isLoading}
+  <p>Checking API status...</p>
+{:else if error}
+  <p class="text-red-500">API Error: {error.message}</p>
+{:else if versionData}
   <div class="bg-green-100 p-4 rounded">
     <p class="font-bold">✓ API Reachable</p>
-    <p>Service: {query.data.name} v{query.data.version}</p>
-    <p class="text-sm text-gray-600">SHA: {query.data.git_sha}</p>
+    <p>Service: {versionData.name} v{versionData.version}</p>
+    <p class="text-sm text-gray-600">SHA: {versionData.git_sha}</p>
   </div>
 {/if}
 ```
@@ -741,6 +781,11 @@ Verify in order:
 - [ ] `.env` files not committed (only `.env.example`)
 - [ ] Git history clean: `git log --oneline | head -5`
 - [ ] `docs/api-contract.md` exists and contains health + version endpoints
+- [ ] No `src/main.ts` file exists
+- [ ] No root `index.html` file exists (only `src/app.html`)
+- [ ] `vite.config.ts` uses `@sveltejs/kit/vite` plugin (not raw svelte plugin)
+- [ ] UI components use Svelte 5 Runes ($state, $effect, $props)
+- [ ] No "component_api_invalid_new" errors in browser console
 
 **Vertical Slice Definition:**
 
@@ -760,6 +805,10 @@ Verify in order:
 ❌ **Modified generated types** → Regenerate, don't edit
 ❌ **Missing tests** → Every module needs >1 test
 ❌ **Untracked dependencies** → Use `uv` (service) and `npm` (UI)
+❌ **Using Svelte 4 entry point patterns** → SvelteKit 2.0+ with Svelte 5 doesn't use `src/main.ts` or `new App()`
+❌ **Using raw @sveltejs/vite-plugin-svelte** → Use @sveltejs/kit/vite instead for proper SvelteKit integration
+❌ **Creating root index.html** → SvelteKit uses src/app.html, never create root index.html
+❌ **Old Svelte component patterns** → Use Svelte 5 Runes ($state, $effect, $props) not export declarations
 
 ---
 
