@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "kuzu-memory": {
+      "type": "stdio",
+      "command": "/Users/mac/.local/pipx/venvs/kuzu-memory/bin/kuzu-memory",
+      "args": [
+        "mcp"
+      ],
+      "env": {
+        "KUZU_MEMORY_PROJECT": "/Users/mac/workspace/research-mind"
+      }
+    }
+  }
+}

@@ -1,0 +1,309 @@
+{
+  "API QA": [
+    "test-driven-development",
+    "systematic-debugging",
+    "async-testing",
+    "performance-profiling"
+  ],
+  "Agentic Coder Optimizer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Clerk Operations": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Code Analysis": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Content Optimization": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Dart Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Data Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "DigitalOcean Ops": [
+    "docker-containerization",
+    "database-migration",
+    "security-scanning",
+    "systematic-debugging"
+  ],
+  "Documentation Agent": [
+    "api-documentation",
+    "code-review"
+  ],
+  "Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Golang Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow",
+    "async-testing"
+  ],
+  "Google Cloud Ops": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow",
+    "async-testing"
+  ],
+  "Imagemagick": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Java Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Javascript Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow",
+    "async-testing"
+  ],
+  "Local Ops": [
+    "docker-containerization",
+    "database-migration",
+    "security-scanning",
+    "systematic-debugging"
+  ],
+  "Memory Manager": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Nextjs Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow",
+    "async-testing"
+  ],
+  "Ops": [
+    "docker-containerization",
+    "database-migration",
+    "security-scanning",
+    "systematic-debugging"
+  ],
+  "Phoenix Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Php Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Product Owner": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Project Organizer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Prompt Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Python Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow",
+    "async-testing"
+  ],
+  "QA": [
+    "test-driven-development",
+    "systematic-debugging",
+    "async-testing",
+    "performance-profiling"
+  ],
+  "React Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow",
+    "async-testing",
+    "performance-profiling"
+  ],
+  "Refactoring Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Research": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Ruby Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Rust Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Security": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Svelte Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Tauri Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Tmux Agent": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Typescript Engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow",
+    "async-testing"
+  ],
+  "Vercel Ops": [
+    "docker-containerization",
+    "database-migration",
+    "security-scanning",
+    "systematic-debugging"
+  ],
+  "Version Control": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "Web QA": [
+    "test-driven-development",
+    "systematic-debugging",
+    "async-testing",
+    "performance-profiling"
+  ],
+  "Web UI": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "mpm_agent_manager": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "mpm_skills_manager": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ],
+  "nestjs-engineer": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow",
+    "async-testing"
+  ],
+  "ticketing_agent": [
+    "test-driven-development",
+    "systematic-debugging",
+    "code-review",
+    "refactoring-patterns",
+    "git-workflow"
+  ]
+}

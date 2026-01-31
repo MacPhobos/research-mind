@@ -1,0 +1,39 @@
+# MCP Vector Search index directory
+.mcp-vector-search/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# Node/JavaScript
+node_modules/
+.svelte-kit/
+build/
+.env
+.env.*
+!.env.example
+dist/
+
+# Database
+postgres_data/
+
+# Nested repositories (managed separately)
+research-mind-service/.git
+research-mind-ui/.git
+
+# IDEs
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
