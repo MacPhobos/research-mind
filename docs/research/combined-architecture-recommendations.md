@@ -1,8 +1,26 @@
 # Combined Architecture Recommendations
 
-**Document Version**: 1.0
-**Date**: 2026-01-30
+**Document Version**: 1.1
+**Date**: 2026-01-31
 **Status**: Final Recommendations & Implementation Strategy
+
+---
+
+## Correction Note (v1.1)
+
+**Date**: 2026-01-31
+
+A critical architectural correction was made during design review:
+
+- **Initial assumption**: Custom SemanticIndexer service would orchestrate indexing
+- **Correction**: mcp-vector-search provides complete indexing and search APIs
+- **Impact**:
+  - Removes ~200 lines of custom job queue code
+  - Reduces MVP timeline from 3-4 weeks to ~10-12 days
+  - Increases reliability (uses proven mcp-vector-search implementation)
+  - Simplifies architecture (thin wrappers, not orchestrators)
+
+All sections below reflect this corrected architecture.
 
 ---
 
@@ -73,15 +91,15 @@ User: "What does token refresh do?"
 
 ### 1.3 MVP Implementation Plan
 
-| Week      | Component         | Effort     | Dependencies              |
-| --------- | ----------------- | ---------- | ------------------------- |
-| **1-2**   | FastAPI wrapper   | 5 days     | mcp-vector-search library |
-| **1-2**   | Session CRUD      | 3 days     | Database (SQLite ok)      |
-| **2**     | Path validator    | 2 days     | -none-                    |
-| **2-3**   | Agent scaffolding | 3 days     | claude-mpm installation   |
-| **3**     | Integration tests | 4 days     | All above                 |
-| **3**     | Docs + deployment | 2 days     | All above                 |
-| **Total** |                   | ~3-4 weeks | -                         |
+| Week      | Component         | Effort      | Dependencies              |
+| --------- | ----------------- | ----------- | ------------------------- |
+| **1**     | FastAPI wrapper   | 2 days      | mcp-vector-search library |
+| **1**     | Session CRUD      | 3 days      | Database (SQLite ok)      |
+| **1-2**   | Path validator    | 2 days      | -none-                    |
+| **2**     | Agent scaffolding | 3 days      | claude-mpm installation   |
+| **2**     | Integration tests | 4 days      | All above                 |
+| **2**     | Docs + deployment | 2 days      | All above                 |
+| **Total** |                   | ~10-12 days | -                         |
 
 ---
 
@@ -117,15 +135,24 @@ User: "What does token refresh do?"
 
 **DO**: Per-session collections (session\_{session_id}) ✓
 
-### 2.4 DO NOT: Synchronous Indexing in HTTP Handler
+### 2.4 DO NOT: Build Custom Indexing When mcp-vector-search Provides It
 
 **Why**:
 
-- Client timeout (indexing takes 30-60+ seconds)
-- No progress feedback
-- Poor UX
+- mcp-vector-search already has complete indexing APIs
+- Custom job queue code = unnecessary complexity and maintenance
+- Re-implementing proven functionality increases bugs
+- Better to use proven, tested implementation
 
-**DO**: Async job model with polling ✓
+**DO**: Use mcp-vector-search's built-in async indexing APIs directly ✓
+
+Our wrapper becomes a thin adapter that:
+
+- Calls `mcp_vector_search.index()` for indexing
+- Calls `mcp_vector_search.search()` for searching
+- Manages session scoping (collection names, paths)
+- Provides job tracking via mcp-vector-search's job model
+- Logs and audits operations
 
 ### 2.5 DO NOT: Trust Agent to Respect filesystem Restrictions
 
@@ -223,6 +250,8 @@ POST /api/sessions/abc-123/add-content
 
 POST /api/sessions/abc-123/index
   ↓
+[Calls mcp-vector-search.index() with collection=session_abc123]
+  ↓
 {
   "job_id": "idx_456",
   "status": "pending"
@@ -231,9 +260,12 @@ POST /api/sessions/abc-123/index
 GET /api/sessions/abc-123/index/jobs/idx_456
   ↓
 [Poll 5-10 times until "completed"]
+[Job tracking delegated to mcp-vector-search; FastAPI wrapper polls and returns status]
 
 POST /api/sessions/abc-123/search
   body: {"query": "OAuth2 token refresh"}
+  ↓
+[Calls mcp-vector-search.search() with collection=session_abc123]
   ↓
 {
   "results": [
@@ -505,7 +537,6 @@ POST /api/sessions/abc-123/analyze
 │      (research-mind-service)                                │
 ├────────────────────────────────────────────────────────────┤
 │ - Session CRUD                                              │
-│ - Job queue management                                      │
 │ - Path validation (sandbox)                                 │
 │ - Audit logging                                             │
 └──────────┬──────────────────────┬────────────────────────┬──┘
@@ -513,18 +544,20 @@ POST /api/sessions/abc-123/analyze
         [Search]             [Indexing]              [Analysis]
            │                      │                        │
 ┌──────────▼──────┐    ┌──────────▼──────┐    ┌───────────▼─────────┐
-│ Vector Search   │    │ Indexing Job    │    │ Claude MPM Agent    │
-│ (REST wrapper)  │    │ Queue           │    │ (subprocess)        │
+│ Search Wrapper  │    │ Index Wrapper   │    │ Claude MPM Agent    │
+│ (thin adapter)  │    │ (thin adapter)  │    │ (subprocess)        │
 ├─────────────────┤    ├─────────────────┤    ├─────────────────────┤
-│ mcp-vector-     │    │ SemanticIndexer │    │ research-analyst    │
-│ search library  │    │ (async)         │    │ agent               │
+│ mcp-vector-     │    │ mcp-vector-     │    │ research-analyst    │
+│ search library  │    │ search library  │    │ agent               │
+│ (search API)    │    │ (index API)     │    │                     │
 └──────────┬──────┘    └────────┬────────┘    └────────┬────────────┘
            │                    │                      │
            └────────┬───────────┴──────────────────────┘
                     │
         ┌───────────▼──────────────────┐
         │  ChromaDB Vector Database    │
-        │  (session collections)       │
+        │  (managed by mcp-vector-     │
+        │   search, session collections)
         │  - session_abc123            │
         │  - session_def456            │
         └───────────┬──────────────────┘
@@ -536,6 +569,7 @@ POST /api/sessions/abc-123/analyze
         │ - Audit logs (SQLite)        │
         │ - Session workspaces (disk)  │
         │ - .mcp-vector-search/ dirs   │
+        │   (index metadata)           │
         └──────────────────────────────┘
 ```
 
@@ -546,8 +580,8 @@ POST /api/sessions/abc-123/analyze
 ### Must Have (MVP)
 
 - [ ] Session management (CRUD)
-- [ ] Indexing job queue
-- [ ] Vector search REST API
+- [ ] Vector search REST API (wrapper around mcp-vector-search)
+- [ ] Indexing REST API (wrapper around mcp-vector-search)
 - [ ] Path validation (sandbox)
 - [ ] Agent invocation with context
 - [ ] Basic audit logging

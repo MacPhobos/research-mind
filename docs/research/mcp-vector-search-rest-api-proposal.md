@@ -1,26 +1,33 @@
 # MCP Vector Search: REST API Proposal
 
-**Document Version**: 1.0
-**Date**: 2026-01-30
+**Document Version**: 1.1
+**Date**: 2026-01-31
 **Status**: Architectural Proposal
 
-## Executive Summary
+## Architecture Decision: Thin FastAPI Wrappers
 
-This document proposes a REST API wrapper around mcp-vector-search for Research-Mind's session-scoped indexing and search requirements. The wrapper is implemented as a separate FastAPI service that imports mcp-vector-search as a library, manages session isolation, async job queuing, and audit logging.
+This document describes thin FastAPI wrappers around mcp-vector-search's existing indexing and search APIs. We are **NOT** re-implementing indexing or search—we are directly delegating to mcp-vector-search's proven implementations.
+
+The wrapper's responsibility is:
+
+- Session-scoped collection management
+- Request validation and error handling
+- Audit logging and monitoring
+- REST API ergonomics (request/response formatting)
 
 **Key decisions**:
 
-- Wrapper service (not embedded REST in mcp-vector-search)
+- Wrapper service imports mcp-vector-search as a library
 - Per-session collections in shared ChromaDB
-- Job-based async indexing with progress tracking
+- Async job model managed by mcp-vector-search (not custom queue)
 - Mandatory session_id on all endpoints
 - Server-side session enforcement (not prompt-based)
 
 ---
 
-## 1. Architecture: Wrapper vs Embedded
+## 1. Architecture: Thin Wrappers Calling mcp-vector-search APIs
 
-### 1.1 Decision: Wrapper Service (Recommended)
+### 1.1 Design: Wrapper Service with Direct API Calls
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -28,11 +35,13 @@ This document proposes a REST API wrapper around mcp-vector-search for Research-
 │  (/Users/mac/workspace/research-mind/          │
 │   research-mind-service/app/)                   │
 ├─────────────────────────────────────────────────┤
-│  - FastAPI app                                  │
+│  - FastAPI endpoints                            │
 │  - Session routing & validation                 │
-│  - Job queue (Celery/RQ or in-process)        │
 │  - Audit logging                               │
+│  - Request/response formatting                  │
 └──────────────┬──────────────────────────────────┘
+               │
+        Direct library calls
                │
                ▼
 ┌─────────────────────────────────────────────────┐
@@ -40,33 +49,63 @@ This document proposes a REST API wrapper around mcp-vector-search for Research-
 │  (from: pip install mcp-vector-search)         │
 ├─────────────────────────────────────────────────┤
 │  from mcp_vector_search.core import:           │
-│    - SemanticIndexer                           │
-│    - SemanticSearchEngine                      │
-│    - ChromaVectorDatabase                      │
+│    - SemanticIndexer (handles indexing)        │
+│    - SemanticSearchEngine (handles search)     │
+│    - ChromaVectorDatabase (manages storage)    │
+│                                                 │
+│  Job management: Already built-in               │
+│  Collection isolation: Via collection_name     │
 └─────────────────────────────────────────────────┘
 ```
 
 **Advantages**:
 
-- ✓ No modification to mcp-vector-search core
-- ✓ Clean separation of concerns
+- ✓ No custom indexing code (use proven implementation)
+- ✓ No custom job queue (mcp-vector-search provides it)
+- ✓ Clean separation: wrapper handles REST+session scoping
+- ✓ Faster MVP (2 days wrapper vs 5 days custom indexer)
 - ✓ Easier to version/upgrade mcp-vector-search
-- ✓ Research-Mind can manage job queuing, logging
+- ✓ Lower maintenance burden
 - ✓ Middleware available for auth, rate limiting
 
 **Disadvantages**:
 
 - ✗ Additional service to deploy
-- ✗ Slight latency overhead (IPC vs library)
+- ✗ Minimal latency overhead (negligible for REST API)
 
-### 1.2 Alternative: Embedded REST
+### 1.2 Example Code: Thin Adapter Pattern
 
-Not recommended because:
+This is what we're building—thin adapters that call mcp-vector-search's APIs directly:
 
-- Would require modifying mcp-vector-search core
-- Session scoping would pollute MCP tool interface
-- Harder to test/debug
-- Job queue management less flexible
+```python
+# research-mind-service/app/routes/vector_search.py
+
+from mcp_vector_search import Client as MVSClient
+
+mcp_client = MVSClient()
+
+@app.post("/api/sessions/{session_id}/index")
+async def index_session(session_id: str, request: IndexRequest):
+    # Directly delegate to mcp-vector-search's index API
+    job = mcp_client.index(
+        collection=f"session_{session_id}",
+        paths=request.paths,
+        force=request.force
+    )
+    return {"job_id": job.id, "status": "pending"}
+
+@app.post("/api/sessions/{session_id}/search")
+async def search_session(session_id: str, query: str, limit: int = 10):
+    # Directly delegate to mcp-vector-search's search API
+    results = mcp_client.search(
+        query=query,
+        collection=f"session_{session_id}",
+        top_k=limit
+    )
+    return {"results": results}
+```
+
+**Key insight**: The wrapper doesn't implement indexing or search—it just calls the existing mcp-vector-search APIs with proper session scoping.
 
 ---
 
@@ -585,43 +624,43 @@ class IndexRequest(BaseModel):
 
 ## 4. Async Job Model
 
-### 4.1 Job Queue Architecture
+### 4.1 Job Model: Delegated to mcp-vector-search
 
-**Implementation options**:
+**Key insight**: mcp-vector-search already provides a complete job model. Our wrapper doesn't implement a job queue—we use the one built into mcp-vector-search.
 
-1. **In-process queue** (simpler, single instance): `asyncio.Queue`
-2. **Redis queue** (distributed): `redis-queue` or `rq`
-3. **Celery** (advanced): Full async task system
+**How it works**:
 
-**Recommended for MVP**: In-process queue with persistence to database
+1. Wrapper calls `mcp_client.index(...)` - returns a job object
+2. Job object has: `id`, `status`, `progress`, `metrics`
+3. Wrapper exposes job status via REST API (forwards mcp-vector-search's job tracking)
+4. No custom queue needed
 
-### 4.2 Job Lifecycle
+### 4.2 Job Lifecycle (Provided by mcp-vector-search)
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│ User submits indexing request (POST /index)         │
+│ User submits indexing request (POST /sessions/.../index)
 └──────────────────┬───────────────────────────────────┘
                    │
                    ▼
 ┌──────────────────────────────────────────────────────┐
-│ Job created in "pending" state                       │
-│ - JobId generated (UUID)                             │
-│ - Stored in research-mind-service DB                 │
-│ - Added to job queue                                 │
+│ FastAPI wrapper calls mcp_client.index()            │
+│ - mcp-vector-search creates job internally          │
+│ - Returns job object with id and status             │
 └──────────────────┬───────────────────────────────────┘
                    │
                    ▼
 ┌──────────────────────────────────────────────────────┐
-│ Job picked up by worker thread                       │
-│ - Status changed to "running"                        │
-│ - start_at timestamp recorded                        │
+│ Wrapper returns job_id and status via REST API       │
+│ - Client polls: GET /sessions/.../index/jobs/{id}   │
 └──────────────────┬───────────────────────────────────┘
                    │
                    ▼
 ┌──────────────────────────────────────────────────────┐
-│ SemanticIndexer processes files                      │
-│ - Emits progress updates (every N files)             │
-│ - Updates progress in Job record                     │
+│ mcp-vector-search processes indexing internally     │
+│ - SemanticIndexer processes files                    │
+│ - Updates job progress                               │
+│ - Stores results in collection                      │
 └──────────────────┬───────────────────────────────────┘
                    │
          ┌─────────┴──────────┐
@@ -631,31 +670,33 @@ class IndexRequest(BaseModel):
          │                    │
          ▼                    ▼
 ┌────────────────┐    ┌────────────────┐
-│ "completed"    │    │ "failed"       │
-│ completed_at   │    │ error_message  │
-│ metrics stored │    │ partial_stats  │
+│status=complete │    │ status=failed  │
+│ metrics avail  │    │ error returned │
 └────────────────┘    └────────────────┘
 ```
 
-### 4.3 Progress Reporting
+### 4.3 Progress Reporting (via mcp-vector-search)
 
 **Polling endpoint**: `GET /api/sessions/{session_id}/index/jobs/{job_id}`
 
-```python
-# Example: Emit progress every 50 files processed
-def index_with_progress(indexer, files, job_id):
-    total = len(files)
-    for i, file in enumerate(files):
-        result = indexer.index_file(file)
+Our wrapper polls mcp-vector-search's job API and returns status:
 
-        if (i + 1) % 50 == 0:
-            # Update progress in database
-            job = Job.query.get(job_id)
-            job.progress = (i + 1) / total
-            job.metrics['files_processed'] = i + 1
-            job.metrics['current_file'] = str(file)
-            db.session.commit()
+```python
+@app.get("/api/sessions/{session_id}/index/jobs/{job_id}")
+async def get_indexing_job_status(session_id: str, job_id: str):
+    # Query mcp-vector-search job tracking
+    job = mcp_client.get_job_status(job_id)
+
+    return {
+        "job_id": job.id,
+        "status": job.status,
+        "progress": job.progress,
+        "metrics": job.metrics,
+        "errors": job.errors or []
+    }
 ```
+
+mcp-vector-search handles all the progress tracking internally.
 
 ### 4.4 Job Cancellation
 
@@ -1008,11 +1049,12 @@ def log_search(session_id: str, query: str, result_count: int, duration_ms: int)
 
 | Aspect           | Details                                                        |
 | ---------------- | -------------------------------------------------------------- |
-| **Architecture** | Wrapper service (FastAPI) around mcp-vector-search library     |
+| **Architecture** | Thin FastAPI wrappers calling mcp-vector-search library APIs   |
 | **Scoping**      | Per-session collections in shared ChromaDB                     |
 | **Enforcement**  | Server-side session_id validation on all endpoints             |
-| **Jobs**         | Async job model with progress tracking and cancellation        |
-| **Search**       | Mandatory session_id, optional filters, similarity threshold   |
+| **Jobs**         | Async job model provided by mcp-vector-search (not custom)     |
+| **Indexing**     | Direct call to mcp_client.index() (not reimplemented)          |
+| **Search**       | Direct call to mcp_client.search() (not reimplemented)         |
 | **Metadata**     | File path, language, type, parent, line numbers, docstrings    |
 | **Isolation**    | Separate collections, metadata dirs, and workspace directories |
 | **Auditability** | Logging plan for searches, indexing, administrative actions    |
