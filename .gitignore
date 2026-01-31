@@ -37,3 +37,14 @@ research-mind-ui/.git
 # OS
 .DS_Store
 Thumbs.db
+/.claude/
+/.claude-mpm/
+/.claude/
+/.claude-mpm/
+/.idea/
+/.mcp-browser/
+/.mcp-vector-search/
+/.kuzu-memory/
+/mcp-vector-search/
+/research-mind-service/
+/research-mind-ui/
