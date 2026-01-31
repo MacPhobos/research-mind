@@ -5,22 +5,27 @@
 Before scaffolding, collect these inputs from the user and confirm:
 
 ### Required Inputs:
+
 1. **Project Name Stem (FOO)**:
+
    - Pattern: `{FOO}` will create `{FOO}-ui/` and `{FOO}-service/`
    - Example: If user says "acme", create `acme-ui/` and `acme-service/`
    - Prompt: "What is your project name stem? (e.g., 'myapp', 'acme', 'weather-app')"
 
 2. **Service Port**:
+
    - Prompt: "What port should the service run on? (e.g., 15010, must be available)"
    - Validation: Must be integer 1024-65535, check `lsof -i :{PORT}` to avoid conflicts
    - Store in: `.env.example` (service) and docs
 
 3. **UI Port**:
+
    - Prompt: "What port should the UI dev server run on? (e.g., 15000, must differ from service port)"
    - Validation: Must differ from service port, check availability
    - Store in: `.env.example` (ui) and docs
 
 4. **Database Password** (for local Postgres):
+
    - Prompt: "Set a local Postgres password for development (e.g., 'devpass123')"
    - Validation: Minimum 8 chars
    - Store in: `.env.example` and `docker-compose.yml`
@@ -30,6 +35,7 @@ Before scaffolding, collect these inputs from the user and confirm:
    - Default: `not-decided-yet` if not provided
 
 **Confirmation Prompt:**
+
 ```
 Scaffolding Configuration:
   Project Name: {FOO}
@@ -65,6 +71,7 @@ Create the following layout:
 ```
 
 **Critical Notes:**
+
 - UI and Service repos are assumed pre-cloned into `{FOO}-ui/` and `{FOO}-service/`
 - They should be empty (no scaffolding yet)
 - If not pre-cloned, initialize them as empty directories
@@ -74,7 +81,9 @@ Create the following layout:
 ## Phase 2: Root-Level Configuration
 
 ### 2.1 `.tool-versions` (Root)
+
 Specify asdf tooling requirements:
+
 ```
 python 3.12.0          # Latest stable 3.12.x
 nodejs 20.11.0         # Latest stable 20.x
@@ -83,6 +92,7 @@ nodejs 20.11.0         # Latest stable 20.x
 Add to `{FOO}-ui/` as needed (inherit from root if possible).
 
 ### 2.2 Root `.env.example`
+
 ```bash
 # Service Configuration
 SERVICE_HOST=localhost
@@ -176,8 +186,9 @@ clean:
 ```
 
 ### 2.4 `docker-compose.yml`
+
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
   postgres:
     image: postgres:16-alpine
@@ -205,6 +216,7 @@ volumes:
 # {FOO} Monorepo Development Guide
 
 ## Quick Start
+
 \`\`\`bash
 make install
 make dev
@@ -214,6 +226,7 @@ Service: http://localhost:{SERVICE_PORT}
 UI: http://localhost:{UI_PORT}
 
 ## Project Structure
+
 - **{FOO}-service/**: Python FastAPI backend
 - **{FOO}-ui/**: SvelteKit TypeScript frontend
 - **docs/**: Shared documentation + API contract
@@ -223,6 +236,7 @@ UI: http://localhost:{UI_PORT}
 **Contract Location**: `docs/api-contract.md` (source of truth)
 
 All changes to the API must:
+
 1. Update `{FOO}-service/docs/api-contract.md`
 2. Update service models
 3. Run service tests
@@ -232,6 +246,7 @@ All changes to the API must:
 7. Run UI tests
 
 **NEVER**:
+
 - Manually edit generated types
 - Deploy without regenerating client
 - Change API without updating contract in BOTH places
@@ -239,31 +254,35 @@ All changes to the API must:
 ## Configuration
 
 ### Service Port: {SERVICE_PORT}
+
 - Change in root `.env` and `docker-compose.yml`
 - Update UI's `VITE_API_BASE_URL`
 
 ### UI Port: {UI_PORT}
+
 - Change in {FOO}-ui/.env
 - CORS may need adjustment in service
 
 ### Database
+
 - Default: Postgres (port 5432, user: postgres)
 - Reset with: `make db-reset`
 
 ## Common Tasks
 
 \`\`\`bash
-make dev              # Start everything
-make stop             # Stop everything
-make test             # Run all tests
-make lint             # Check code quality
-make gen-client       # Regenerate TS client from OpenAPI
-make db-reset         # Drop and recreate database
+make dev # Start everything
+make stop # Stop everything
+make test # Run all tests
+make lint # Check code quality
+make gen-client # Regenerate TS client from OpenAPI
+make db-reset # Drop and recreate database
 \`\`\`
 
 ## Adding a New Endpoint
 
 1. **Service**:
+
    - Add route in `{FOO}-service/app/routes/`
    - Add Pydantic models in `{FOO}-service/app/schemas/`
    - Write test in `{FOO}-service/tests/`
@@ -287,7 +306,7 @@ make db-reset         # Drop and recreate database
 - User authentication (stubs exist, production auth TBD)
 - Multi-environment setup (local dev only for now)
 - Load testing or scale optimization
-\`\`\`
+  \`\`\`
 
 ---
 
@@ -295,44 +314,46 @@ make db-reset         # Drop and recreate database
 
 ### 3.1 Core Structure
 ```
+
 {FOO}-service/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py                 # FastAPI app + routes
-│   ├── config.py               # Pydantic settings
-│   ├── schemas/                # Pydantic models (requests/responses)
-│   │   ├── __init__.py
-│   │   └── common.py           # ErrorResponse, HealthResponse
-│   ├── models/                 # SQLAlchemy ORM models
-│   │   ├── __init__.py
-│   │   └── base.py             # Timestamps, UUID pk
-│   ├── routes/
-│   │   ├── __init__.py
-│   │   ├── health.py           # GET /health
-│   │   └── api.py              # Versioned /api/v1/* routes
-│   ├── db/
-│   │   ├── __init__.py
-│   │   ├── engine.py           # SQLAlchemy setup
-│   │   └── session.py          # Dependency
-│   └── auth/                   # OAuth2 + JWT stubs
-│       ├── __init__.py
-│       ├── oauth2.py
-│       └── jwt.py
-├── migrations/                 # Alembic
-│   ├── versions/
-│   └── env.py
+│ ├── **init**.py
+│ ├── main.py # FastAPI app + routes
+│ ├── config.py # Pydantic settings
+│ ├── schemas/ # Pydantic models (requests/responses)
+│ │ ├── **init**.py
+│ │ └── common.py # ErrorResponse, HealthResponse
+│ ├── models/ # SQLAlchemy ORM models
+│ │ ├── **init**.py
+│ │ └── base.py # Timestamps, UUID pk
+│ ├── routes/
+│ │ ├── **init**.py
+│ │ ├── health.py # GET /health
+│ │ └── api.py # Versioned /api/v1/\* routes
+│ ├── db/
+│ │ ├── **init**.py
+│ │ ├── engine.py # SQLAlchemy setup
+│ │ └── session.py # Dependency
+│ └── auth/ # OAuth2 + JWT stubs
+│ ├── **init**.py
+│ ├── oauth2.py
+│ └── jwt.py
+├── migrations/ # Alembic
+│ ├── versions/
+│ └── env.py
 ├── tests/
-│   ├── conftest.py
-│   ├── test_health.py
-│   └── test_api.py
+│ ├── conftest.py
+│ ├── test_health.py
+│ └── test_api.py
 ├── pyproject.toml
 ├── .tool-versions
 ├── .env.example
 ├── docs/
-│   ├── api-contract.md         # LOCKED - copy from root
-│   └── CLAUDE.md
+│ ├── api-contract.md # LOCKED - copy from root
+│ └── CLAUDE.md
 └── README.md
-```
+
+````
 
 ### 3.2 `pyproject.toml`
 ```toml
@@ -362,9 +383,10 @@ dev = [
     "black==23.12.0",
     "mypy==1.7.1",
 ]
-```
+````
 
 ### 3.3 `{FOO}-service/.env.example`
+
 ```bash
 # Server
 SERVICE_ENV=development
@@ -372,7 +394,7 @@ SERVICE_HOST=0.0.0.0
 SERVICE_PORT={SERVICE_PORT}
 
 # Database
-DATABASE_URL=postgresql://postgres:devpass123@localhost:5432/{FOO}_db
+DATABASE_URL=postgresql://postgres:devpass123@localhost:5432/{FOO}_db  # pragma: allowlist secret
 
 # CORS
 CORS_ORIGINS=http://localhost:{UI_PORT}
@@ -385,6 +407,7 @@ ALGORITHM=HS256
 ### 3.4 Key Service Files
 
 **app/main.py**:
+
 ```python
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -422,6 +445,7 @@ app.include_router(api.router, prefix="/api/v1")
 ```
 
 **app/routes/health.py**:
+
 ```python
 from fastapi import APIRouter
 from typing import Literal
@@ -441,6 +465,7 @@ async def health_check():
 ```
 
 **app/routes/api.py** (Vertical slice example):
+
 ```python
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -462,6 +487,7 @@ async def get_version():
 ```
 
 **app/schemas/common.py**:
+
 ```python
 from pydantic import BaseModel
 from typing import TypeVar, Generic, List
@@ -483,6 +509,7 @@ class HealthResponse(BaseModel):
 ```
 
 **tests/test_health.py**:
+
 ```python
 import pytest
 from fastapi.testclient import TestClient
@@ -501,12 +528,14 @@ def test_health_endpoint():
 ### 3.5 Alembic Migrations
 
 Initialize Alembic:
+
 ```bash
 cd {FOO}-service
 alembic init migrations
 ```
 
 **First migration** (`migrations/versions/001_initial.py`):
+
 ```python
 from alembic import op
 import sqlalchemy as sa
@@ -530,6 +559,7 @@ def downgrade():
 ## Phase 4: UI Scaffolding ({FOO}-ui/)
 
 ### 4.1 Core Structure
+
 ```
 {FOO}-ui/
 ├── src/
@@ -562,6 +592,7 @@ def downgrade():
 ```
 
 ### 4.2 `package.json`
+
 ```json
 {
   "name": "{FOO}-ui",
@@ -599,6 +630,7 @@ def downgrade():
 ```
 
 ### 4.3 `{FOO}-ui/.env.example`
+
 ```bash
 VITE_API_BASE_URL=http://localhost:{SERVICE_PORT}
 ```
@@ -606,6 +638,7 @@ VITE_API_BASE_URL=http://localhost:{SERVICE_PORT}
 ### 4.4 Key UI Files
 
 **src/routes/+page.svelte** (Vertical slice):
+
 ```svelte
 <script lang="ts">
   import { useQuery } from '@tanstack/svelte-query';
@@ -625,6 +658,7 @@ VITE_API_BASE_URL=http://localhost:{SERVICE_PORT}
 ```
 
 **src/lib/components/ApiStatus.svelte**:
+
 ```svelte
 <script lang="ts">
   export let query;
@@ -644,25 +678,27 @@ VITE_API_BASE_URL=http://localhost:{SERVICE_PORT}
 ```
 
 **src/lib/api/client.ts**:
+
 ```typescript
-import { PUBLIC_API_BASE_URL } from '$env/static/public';
-import type * as API from './generated';
+import { PUBLIC_API_BASE_URL } from "$env/static/public";
+import type * as API from "./generated";
 
 export const apiClient = {
   async getVersion(): Promise<API.VersionResponse> {
     const res = await fetch(`${PUBLIC_API_BASE_URL}/api/v1/version`);
-    if (!res.ok) throw new Error('Failed to fetch version');
+    if (!res.ok) throw new Error("Failed to fetch version");
     return res.json();
   },
 };
 ```
 
 **tests/api.test.ts**:
-```typescript
-import { describe, it, expect } from 'vitest';
 
-describe('API Client', () => {
-  it('should be defined', () => {
+```typescript
+import { describe, it, expect } from "vitest";
+
+describe("API Client", () => {
+  it("should be defined", () => {
     expect(true).toBe(true);
   });
 });
@@ -680,6 +716,7 @@ make dev
 ```
 
 Verify in order:
+
 1. ✅ **Service starts**: `curl http://localhost:{SERVICE_PORT}/health`
 2. ✅ **OpenAPI available**: `curl http://localhost:{SERVICE_PORT}/openapi.json`
 3. ✅ **UI loads**: Open `http://localhost:{UI_PORT}` in browser
@@ -706,6 +743,7 @@ Verify in order:
 - [ ] `docs/api-contract.md` exists and contains health + version endpoints
 
 **Vertical Slice Definition:**
+
 - Service exposes 2 working endpoints: `/health`, `/api/v1/version`
 - UI uses generated TypeScript client to call service
 - UI displays result from service in the browser
@@ -728,6 +766,7 @@ Verify in order:
 ## Files Reference
 
 **Root Level Files to Create:**
+
 - `Makefile`
 - `.tool-versions`
 - `docker-compose.yml`
@@ -738,9 +777,11 @@ Verify in order:
 - `.gitignore`
 
 **Service Setup:**
+
 - Generated by `uv init` and project structure above
 
 **UI Setup:**
+
 - Generated by `npm create vite` (SvelteKit template) then customized
 
 ---
@@ -748,6 +789,7 @@ Verify in order:
 ## Success Definition
 
 You are DONE when:
+
 1. Running `make dev` starts all services
 2. The UI page displays "API Reachable" from real API calls
 3. All tests pass
