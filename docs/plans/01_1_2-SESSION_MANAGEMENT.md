@@ -9,11 +9,16 @@
 **Can Parallel With**: 1.3, 1.4
 **Status**: CRITICAL - Enables session-scoped operations
 
+> **ARCHITECTURE NOTE (v2.0)**: This document reflects the subprocess-based architecture.
+> Sessions track workspace registration. Index status is determined by checking
+> if `.mcp-vector-search/` directory exists in the workspace, not by in-memory state.
+> See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) for details.
+
 ---
 
 ## Subphase Objective
 
-Implement session CRUD endpoints with persistent storage. Sessions are the fundamental isolation unit for the entire system - each session gets its own workspace directory and ChromaDB collection.
+Implement session CRUD endpoints with persistent storage. Sessions are the fundamental isolation unit for the entire system - each session gets its own workspace directory. Indexing is performed via subprocess invocation (Phase 1.3), and index status is verified by checking the workspace filesystem.
 
 **Success Definition**: Users can:
 
@@ -23,6 +28,7 @@ Implement session CRUD endpoints with persistent storage. Sessions are the funda
 - Delete sessions with DELETE /api/sessions/{session_id}
 - Session workspace directories created and isolated on disk
 - Session metadata persists in database
+- Index status determined by `.mcp-vector-search/` directory existence
 
 ---
 
@@ -56,7 +62,7 @@ Implement session CRUD endpoints with persistent storage. Sessions are the funda
 1. **research-mind-service/app/models/session.py** (completed)
 
    - SQLAlchemy ORM model for sessions
-   - All required fields (ID, name, workspace, timestamps, status, stats)
+   - All required fields (ID, name, workspace, timestamps, status)
 
 2. **research-mind-service/app/schemas/session.py** (new)
 
@@ -103,12 +109,17 @@ Implement session CRUD endpoints with persistent storage. Sessions are the funda
 Session model persisting research context and configuration.
 
 Each session is an isolated workspace for indexing and analysis.
-Includes workspace configuration, index statistics, and lifecycle tracking.
+Includes workspace configuration and lifecycle tracking.
+
+NOTE: Index status is NOT tracked in the database. It is determined
+at runtime by checking if .mcp-vector-search/ directory exists
+in the workspace directory. This reflects the subprocess-based
+architecture where mcp-vector-search manages its own index artifacts.
 """
 
 from datetime import datetime
 from uuid import uuid4
-from sqlalchemy import Column, String, DateTime, JSON, Boolean, Integer
+from sqlalchemy import Column, String, DateTime, Boolean, Integer
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -119,14 +130,13 @@ class Session(Base):
     Research session persistent storage.
 
     A session represents an isolated workspace where users:
-    1. Upload/index content (codebase files)
-    2. Search indexed content
-    3. Invoke agents for analysis
+    1. Register a workspace directory
+    2. Index content via mcp-vector-search subprocess
+    3. (Phase 2) Search indexed content via Claude Code MCP interface
 
     Each session is 100% isolated:
     - Dedicated workspace directory
-    - Dedicated ChromaDB collection
-    - Dedicated agent subprocess
+    - Independent .mcp-vector-search/ index artifacts
     - Dedicated audit log entries
 
     Fields:
@@ -134,22 +144,20 @@ class Session(Base):
         name: Human-readable session name (required)
         description: Optional session description
         workspace_path: Root directory for session content
-            Format: /var/lib/research-mind/sessions/{session_id}
+            Format: /var/lib/research-mind/workspaces/{session_id}
         created_at: Session creation timestamp (UTC, immutable)
         last_accessed: Last activity timestamp (UTC, mutable)
         status: Lifecycle status (active, archived, deleted)
             - active: session can be used
             - archived: session preserved but not active
             - deleted: session marked for cleanup
-        index_stats: JSON blob with indexing metadata
-            Keys:
-            - file_count: Number of indexed files
-            - chunk_count: Number of indexed text chunks
-            - total_size_bytes: Total indexed content size
-            - last_indexed_at: Timestamp of last indexing job
-            - last_indexed_duration_seconds: Time for last job
         archived: Boolean flag for soft-delete (complements status)
         ttl_seconds: Time-to-live for session (Phase 2)
+
+    Index Status:
+        Determined at runtime by checking:
+            Path(workspace_path) / ".mcp-vector-search/" exists
+        NOT stored in database (subprocess manages index artifacts)
     """
 
     __tablename__ = "sessions"
@@ -183,19 +191,6 @@ class Session(Base):
     # TTL for cleanup (Phase 2)
     ttl_seconds = Column(Integer, nullable=True, default=None)
 
-    # Index Metadata (JSON)
-    index_stats = Column(
-        JSON,
-        nullable=True,
-        default={
-            "file_count": 0,
-            "chunk_count": 0,
-            "total_size_bytes": 0,
-            "last_indexed_at": None,
-            "last_indexed_duration_seconds": None,
-        },
-    )
-
     def __repr__(self):
         return f"<Session {self.session_id}: {self.name} ({self.status})>"
 
@@ -206,6 +201,18 @@ class Session(Base):
     def is_active(self) -> bool:
         """Check if session is active."""
         return self.status == "active" and not self.archived
+
+    def is_indexed(self) -> bool:
+        """
+        Check if workspace has been indexed by mcp-vector-search.
+
+        Checks for .mcp-vector-search/ directory in workspace.
+        This is the subprocess-based approach - index artifacts
+        are managed by the CLI tool, not tracked in the database.
+        """
+        from pathlib import Path
+        index_dir = Path(self.workspace_path) / ".mcp-vector-search"
+        return index_dir.is_dir()
 
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
@@ -218,13 +225,13 @@ class Session(Base):
             "last_accessed": self.last_accessed.isoformat(),
             "status": self.status,
             "archived": self.archived,
-            "index_stats": self.index_stats or {},
+            "is_indexed": self.is_indexed(),
         }
 ```
 
 2. **Verify model imports**
    ```bash
-   python3 -c "from app.models.session import Session, Base; print('✓ Session model complete')"
+   python3 -c "from app.models.session import Session, Base; print('Session model complete')"
    ```
 
 ---
@@ -266,7 +273,6 @@ class Session(Base):
            sa.Column('status', sa.String(50), nullable=False),
            sa.Column('archived', sa.Boolean(), nullable=False),
            sa.Column('ttl_seconds', sa.Integer(), nullable=True),
-           sa.Column('index_stats', sa.JSON(), nullable=True),
            sa.PrimaryKeyConstraint('session_id'),
            sa.UniqueConstraint('workspace_path'),
        )
@@ -279,6 +285,9 @@ class Session(Base):
        op.drop_index('idx_sessions_status')
        op.drop_table('sessions')
    ```
+
+   **Note**: No `index_stats` JSON column. Index status is determined at runtime
+   by checking if `.mcp-vector-search/` directory exists in the workspace.
 
 3. **Apply migration**
 
@@ -342,9 +351,9 @@ class SessionResponse(BaseModel):
     last_accessed: str = Field(..., description="Last access timestamp (ISO 8601)")
     status: str = Field(..., description="Session status (active, archived, deleted)")
     archived: bool = Field(..., description="Is session archived?")
-    index_stats: dict = Field(
+    is_indexed: bool = Field(
         ...,
-        description="Index statistics (file_count, chunk_count, etc.)"
+        description="Whether workspace has been indexed (determined by .mcp-vector-search/ directory existence)"
     )
 
     class Config:
@@ -353,17 +362,12 @@ class SessionResponse(BaseModel):
                 "session_id": "550e8400-e29b-41d4-a716-446655440000",
                 "name": "FastAPI Code Review",
                 "description": "Analyzing FastAPI router implementation",
-                "workspace_path": "/var/lib/research-mind/sessions/550e8400-e29b-41d4-a716-446655440000",
+                "workspace_path": "/var/lib/research-mind/workspaces/550e8400-e29b-41d4-a716-446655440000",
                 "created_at": "2026-01-31T12:00:00Z",
                 "last_accessed": "2026-01-31T12:30:00Z",
                 "status": "active",
                 "archived": False,
-                "index_stats": {
-                    "file_count": 42,
-                    "chunk_count": 1250,
-                    "total_size_bytes": 2500000,
-                    "last_indexed_at": "2026-01-31T12:15:00Z",
-                },
+                "is_indexed": True,
             }
         }
 
@@ -417,6 +421,11 @@ class UpdateSessionRequest(BaseModel):
 ```python
 """
 Session management service with workspace handling.
+
+NOTE: Index status is determined at runtime by checking if
+.mcp-vector-search/ directory exists in the workspace.
+The session service does NOT manage indexing - that is
+handled by WorkspaceIndexer subprocess in Phase 1.3.
 """
 
 import logging
@@ -455,28 +464,29 @@ class SessionService:
         session = Session(
             name=request.name,
             description=request.description,
-            workspace_path=f"{settings.session_workspace_root}/{session.session_id}",
+            workspace_path=f"{settings.workspace_root}/{session.session_id}",
         )
 
         # Create workspace directory
         workspace_path = Path(session.workspace_path)
         try:
             workspace_path.mkdir(parents=True, exist_ok=True)
-            logger.info(f"✓ Created session workspace: {workspace_path}")
+            logger.info(f"Created session workspace: {workspace_path}")
         except Exception as e:
-            logger.error(f"✗ Failed to create workspace: {e}")
+            logger.error(f"Failed to create workspace: {e}")
             raise ValueError(f"Failed to create workspace: {e}")
 
         # Create subdirectories
         (workspace_path / "content").mkdir(exist_ok=True)
-        (workspace_path / ".mcp-vector-search").mkdir(exist_ok=True)
+        # NOTE: .mcp-vector-search/ is created by the subprocess
+        # when mcp-vector-search init is run (Phase 1.3)
 
         # Persist to database
         db.add(session)
         db.commit()
         db.refresh(session)
 
-        logger.info(f"✓ Created session {session.session_id}")
+        logger.info(f"Created session {session.session_id}")
         return session
 
     @staticmethod
@@ -511,6 +521,9 @@ class SessionService:
         """
         Delete session and cleanup workspace.
 
+        Removes workspace directory (including .mcp-vector-search/
+        index artifacts if they exist).
+
         Args:
             db: Database session
             session_id: Session to delete
@@ -522,40 +535,21 @@ class SessionService:
         if not session:
             return False
 
-        # Cleanup workspace directory
+        # Cleanup workspace directory (includes .mcp-vector-search/ artifacts)
         workspace_path = Path(session.workspace_path)
         if workspace_path.exists():
             try:
                 shutil.rmtree(workspace_path)
-                logger.info(f"✓ Deleted workspace: {workspace_path}")
+                logger.info(f"Deleted workspace: {workspace_path}")
             except Exception as e:
-                logger.error(f"✗ Failed to delete workspace: {e}")
+                logger.error(f"Failed to delete workspace: {e}")
 
         # Delete from database
         db.delete(session)
         db.commit()
 
-        logger.info(f"✓ Deleted session {session_id}")
+        logger.info(f"Deleted session {session_id}")
         return True
-
-    @staticmethod
-    def update_index_stats(
-        db: DBSession,
-        session_id: str,
-        file_count: int,
-        chunk_count: int,
-        total_size_bytes: int,
-    ):
-        """Update session index statistics (called from Phase 1.3)."""
-        session = db.query(Session).filter_by(session_id=session_id).first()
-        if session:
-            session.index_stats = {
-                "file_count": file_count,
-                "chunk_count": chunk_count,
-                "total_size_bytes": total_size_bytes,
-                "last_indexed_at": datetime.utcnow().isoformat(),
-            }
-            db.commit()
 ```
 
 ---
@@ -577,7 +571,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session as DBSession
 
-from app.main import get_vector_search_manager
 from app.models.session import Session
 from app.schemas.session import (
     CreateSessionRequest,
@@ -620,7 +613,7 @@ async def create_session(
         session = SessionService.create_session(db, request)
         return SessionResponse(**session.to_dict())
     except ValueError as e:
-        logger.error(f"✗ Failed to create session: {e}")
+        logger.error(f"Failed to create session: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
@@ -638,7 +631,7 @@ async def get_session(
     **Path Parameters**:
     - `session_id`: Session UUID
 
-    **Returns**: Session details
+    **Returns**: Session details including is_indexed status
 
     **Status Codes**:
     - 200: Session found
@@ -685,6 +678,9 @@ async def delete_session(
 ):
     """
     Delete a session and cleanup workspace.
+
+    Removes session from database and deletes workspace directory
+    (including .mcp-vector-search/ index artifacts if present).
 
     **Path Parameters**:
     - `session_id`: Session UUID
@@ -819,6 +815,7 @@ def test_create_session():
     data = response.json()
     assert data["name"] == "Test Session"
     assert "session_id" in data
+    assert "is_indexed" in data
 
 
 def test_get_session(test_session_id):
@@ -827,6 +824,8 @@ def test_get_session(test_session_id):
     assert response.status_code == 200
     data = response.json()
     assert data["session_id"] == test_session_id
+    # is_indexed reflects filesystem state
+    assert "is_indexed" in data
 
 
 def test_list_sessions():
@@ -860,6 +859,25 @@ def test_session_isolation():
     assert id1 != id2
     assert resp1.json()["name"] == "Session 1"
     assert resp2.json()["name"] == "Session 2"
+
+
+def test_session_index_status_reflects_filesystem():
+    """Test that is_indexed reflects .mcp-vector-search/ directory."""
+    from pathlib import Path
+
+    resp = client.post("/api/sessions", json={"name": "Index Test"})
+    data = resp.json()
+    workspace = Path(data["workspace_path"])
+
+    # Initially not indexed
+    assert data["is_indexed"] is False
+
+    # Create .mcp-vector-search/ to simulate indexing
+    (workspace / ".mcp-vector-search").mkdir(parents=True, exist_ok=True)
+
+    # Re-fetch should show indexed
+    resp2 = client.get(f"/api/sessions/{data['session_id']}")
+    assert resp2.json()["is_indexed"] is True
 ```
 
 2. **Run tests**
@@ -885,10 +903,11 @@ def test_session_isolation():
 - Workspace directory structure
 - Session validation patterns
 
-**docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md** (Section 5)
+**docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md** (v2.0)
 
-- Configuration and workspace setup
-- Session-scoped collection naming
+- Workspace directory structure with .mcp-vector-search/
+- Index status checking pattern (directory existence)
+- Subprocess-based architecture overview
 
 ### Secondary References
 
@@ -907,12 +926,13 @@ def test_session_isolation():
 - [ ] DELETE /api/sessions/{id} returns 204
 - [ ] Invalid session_id returns 404
 - [ ] Required fields validated (name required)
+- [ ] is_indexed field reflects .mcp-vector-search/ directory existence
 
 ### Data Persistence (MUST COMPLETE)
 
 - [ ] Session data persists to database
 - [ ] Workspace directory created on session creation
-- [ ] Workspace directory deleted on session deletion
+- [ ] Workspace directory deleted on session deletion (including index artifacts)
 - [ ] Multiple sessions coexist independently
 - [ ] Session timestamps tracked (created_at, last_accessed)
 
@@ -922,6 +942,7 @@ def test_session_isolation():
 - [ ] Isolation tests pass (multiple sessions)
 - [ ] Error cases handled (404, 400, 500)
 - [ ] Database transactions working
+- [ ] Index status filesystem check tested
 - [ ] > 90% test coverage
 
 ### Go/No-Go Criteria
@@ -931,6 +952,7 @@ def test_session_isolation():
 - [ ] All CRUD endpoints working
 - [ ] Database persistence verified
 - [ ] Workspace directories created/deleted correctly
+- [ ] is_indexed reflects filesystem state correctly
 - [ ] All tests passing
 - [ ] Tech lead approves implementation
 
@@ -943,13 +965,15 @@ def test_session_isolation():
 - Session CRUD endpoints for creating, reading, listing, deleting sessions
 - Database persistence with SQLAlchemy ORM
 - Workspace directory management for per-session isolation
+- Runtime index status checking via .mcp-vector-search/ directory existence
 - Comprehensive testing of all operations
 
-Completes the first layer of isolation: sessions are the fundamental unit and workspace directories are created on disk for each session.
+Completes the first layer of isolation: sessions are the fundamental unit and workspace directories are created on disk for each session. Index artifacts are managed by the mcp-vector-search subprocess (Phase 1.3), not by the session model.
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2026-01-31
-**Next Phase**: Phase 1.3 (Vector Search API), 1.4 (Path Validator), 1.5 (Audit Logging)
+**Document Version**: 2.0
+**Last Updated**: 2026-02-01
+**Architecture**: Subprocess-based (replaces v1.0 library embedding approach)
+**Next Phase**: Phase 1.3 (Indexing Operations), 1.4 (Path Validator), 1.5 (Audit Logging)
 **Parent**: 01-PHASE_1_FOUNDATION.md

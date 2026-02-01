@@ -7,6 +7,11 @@
 **Prerequisite**: Phase 1.7 (all tests passing)
 **Status**: FINAL PHASE - MVP release
 
+> **ARCHITECTURE NOTE (v2.0)**: This document reflects the subprocess-based architecture.
+> Phase 1 MVP delivers workspace registration and indexing (not search/analysis).
+> Search and agent analysis are deferred to Phase 2.
+> See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) for details.
+
 ---
 
 ## Subphase Objective
@@ -43,8 +48,8 @@ Create **research-mind-service/README.md**:
 ````markdown
 # Research-Mind Service
 
-Session-scoped agentic research system combining semantic code search
-with Claude agent analysis.
+Session-scoped workspace indexing service using mcp-vector-search
+subprocess for codebase indexing.
 
 ## Quick Start
 
@@ -55,36 +60,58 @@ docker-compose up
 # Create session
 curl -X POST http://localhost:15010/api/sessions \
   -H "Content-Type: application/json" \
-  -d '{"name": "Test Session"}'
+  -d '{"name": "My Project"}'
 
-# Index content
-curl -X POST http://localhost:15010/api/sessions/{session_id}/index \
+# Trigger indexing (mcp-vector-search subprocess)
+curl -X POST http://localhost:15010/api/v1/workspaces/{session_id}/index \
   -H "Content-Type: application/json" \
-  -d '{"directory_path": "/path/to/code"}'
+  -d '{"force": true}'
 
-# Search
-curl -X POST http://localhost:15010/api/sessions/{session_id}/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "how does auth work", "limit": 10}'
-
-# Analyze
-curl -X POST http://localhost:15010/api/sessions/{session_id}/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"question": "explain authentication flow"}'
+# Check index status
+curl http://localhost:15010/api/v1/workspaces/{session_id}/index/status
 ```
 ````
 
 ## API Endpoints
 
+### Session Management
+
 - POST /api/sessions - Create session
 - GET /api/sessions - List sessions
 - GET /api/sessions/{id} - Get session
 - DELETE /api/sessions/{id} - Delete session
-- POST /api/sessions/{id}/index - Start indexing
-- GET /api/sessions/{id}/index/jobs/{job_id} - Get job status
-- POST /api/sessions/{id}/search - Search indexed content
-- POST /api/sessions/{id}/analyze - Invoke agent
+
+### Indexing Operations
+
+- POST /api/v1/workspaces/{id}/index - Trigger indexing via subprocess
+- GET /api/v1/workspaces/{id}/index/status - Check index status
+
+### System
+
 - GET /api/health - Health check
+
+## Architecture
+
+- FastAPI + Uvicorn
+- mcp-vector-search CLI (subprocess-based indexing)
+- SQLAlchemy ORM
+- Per-workspace isolation via .mcp-vector-search/ directory
+
+### How Indexing Works
+
+```
+POST /api/v1/workspaces/{id}/index
+  ↓
+IndexingService.index_workspace()
+  ↓
+WorkspaceIndexer (subprocess manager)
+  ├── subprocess.run(["mcp-vector-search", "init", "--force"], cwd=workspace_dir)
+  └── subprocess.run(["mcp-vector-search", "index", "--force"], cwd=workspace_dir)
+  ↓
+Exit code 0 = success, 1 = failure
+  ↓
+Index artifacts in workspace/.mcp-vector-search/
+```
 
 ## Configuration
 
@@ -94,15 +121,10 @@ Key variables:
 
 - PORT: Service port (default 15010)
 - DATABASE_URL: Database connection
-- EMBEDDINGS_MODEL: Model for embeddings (default: all-MiniLM-L6-v2)
-
-## Architecture
-
-- FastAPI + Uvicorn
-- mcp-vector-search for indexing/search
-- Claude-ppm for agent analysis
-- SQLAlchemy ORM
-- Per-session isolation
+- WORKSPACE_ROOT: Root directory for workspaces
+- INDEXING_INIT_TIMEOUT: Timeout for init subprocess (default 30s)
+- INDEXING_INDEX_TIMEOUT: Timeout for index subprocess (default 60s)
+- INDEXING_LARGE_TIMEOUT: Timeout for large projects (default 600s)
 
 ## Testing
 
@@ -115,9 +137,14 @@ Expected: >90% coverage, all tests pass
 ## Security
 
 - Infrastructure-level path validation
-- Session isolation enforced
-- Network disabled in agent subprocess
+- Session/workspace isolation enforced
 - Audit logging for all operations
+
+## Phase 2 (Planned)
+
+- Search via Claude Code MCP interface
+- Agent analysis with citations
+- Incremental re-indexing
 
 ````
 
@@ -156,14 +183,16 @@ services:
       HOST: 0.0.0.0
       PORT: 15010
       DEBUG: "false"
+      WORKSPACE_ROOT: /var/lib/research-mind/workspaces
+      INDEXING_INIT_TIMEOUT: 30
+      INDEXING_INDEX_TIMEOUT: 60
+      INDEXING_LARGE_TIMEOUT: 600
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./research-mind-service:/app
-      - session_data:/var/lib/research-mind/sessions
-      - chromadb_data:/var/lib/research-mind/chromadb
-      - hf_cache:${HF_CACHE_DIR:-/root/.cache/huggingface}
+      - workspace_data:/var/lib/research-mind/workspaces
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:15010/api/health"]
       interval: 30s
@@ -172,9 +201,7 @@ services:
 
 volumes:
   postgres_data:
-  session_data:
-  chromadb_data:
-  hf_cache:
+  workspace_data:
 ````
 
 ### Task 1.8.3: API Contract
@@ -185,16 +212,46 @@ Create **docs/api-contract.md** documenting all endpoints with:
 - Status codes
 - Error responses
 - Examples
+- Note that search/analyze endpoints are Phase 2
 
 ### Task 1.8.4: Deployment Guide
 
 Create **DEPLOYMENT.md** with:
 
-- Kubernetes deployment manifests (Phase 4)
 - Single-instance Docker deployment
 - Database setup
+- mcp-vector-search CLI verification
+- Subprocess timeout tuning for production workspaces
 - SSL/TLS configuration
 - Monitoring setup
+
+### Task 1.8.5: Troubleshooting Guide
+
+Create **TROUBLESHOOTING.md** covering:
+
+- "mcp-vector-search: command not found" - verify installation
+- "Indexing timed out" - increase timeout configuration
+- "Permission denied on .mcp-vector-search/" - check workspace permissions
+- "Index corruption detected" - delete .mcp-vector-search/ and re-index
+- "Model download fails" - check disk space and network connectivity
+
+Reference: `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) Troubleshooting section
+
+---
+
+## Release Checklist
+
+- [ ] `docker-compose up` works end-to-end
+- [ ] Service starts healthily (health check passes)
+- [ ] mcp-vector-search CLI available inside container
+- [ ] Subprocess invocation works from inside container
+- [ ] All session CRUD endpoints documented with examples
+- [ ] All indexing endpoints documented with examples
+- [ ] Error codes documented (subprocess exit codes, HTTP status codes)
+- [ ] Configuration documented (.env.example complete)
+- [ ] Deployment guide complete
+- [ ] Troubleshooting guide covers 5+ subprocess-specific issues
+- [ ] Integration guide reference updated to v2.0 subprocess approach
 
 ---
 
@@ -215,13 +272,16 @@ Create **DEPLOYMENT.md** with:
 **Phase 1.8** completes Phase 1 by:
 
 - Making MVP deployable locally
-- Documenting all functionality
+- Documenting all workspace registration and indexing functionality
 - Providing deployment path to production
+- Referencing subprocess integration guide (v2.0) for implementation details
 
-MVP is now complete and ready for user testing.
+**Phase 1 MVP scope**: Workspace registration and indexing service.
+Search and agent analysis are Phase 2 features.
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2026-01-31
+**Document Version**: 2.0
+**Last Updated**: 2026-02-01
+**Architecture**: Subprocess-based (replaces v1.0 library embedding approach)
 **Parent**: 01-PHASE_1_FOUNDATION.md

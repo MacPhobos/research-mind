@@ -26,7 +26,7 @@ Verify mcp-vector-search is properly installed, configured, and tested. Establis
 ### Day 2 (4-6 hours)
 
 - Task 1.0.4: Create Sandbox Directory (1 hour)
-- Task 1.0.5: Test Model Caching (1-2 hours)
+- Task 1.0.5: Test Subprocess Model Download (1-2 hours)
 - Task 1.0.6: Session Model Stub (1-2 hours)
 - Task 1.0.7: Verify Docker (1 hour)
 
@@ -35,18 +35,19 @@ Verify mcp-vector-search is properly installed, configured, and tested. Establis
 - Task 1.0.8: Document Baseline (2-4 hours)
 
 **Total Estimated Time**: 10-18 calendar hours across 2-3 business days
-**Critical Path**: Task 1.0.2 (mcp-vector-search installation) is longest single task
+**Critical Path**: Task 1.0.2 (mcp-vector-search CLI installation) is longest single task
 
 ---
 
 ## Deliverables
 
-1. **Updated pyproject.toml** with mcp-vector-search dependency (pinned version)
+1. **Updated pyproject.toml** with mcp-vector-search dependency (pinned version, provides CLI tool)
 2. **.env.example template** with all required environment variables
 3. **docs/PHASE_1_0_BASELINE.md** documenting:
    - System environment (Python version, OS, disk space, memory)
-   - Package versions installed (mcp-vector-search, PyTorch, transformers, ChromaDB, etc.)
-   - Performance baselines (model load time, embedding speed, search latency)
+   - mcp-vector-search CLI version and path (`which mcp-vector-search`)
+   - Subprocess invocation baselines (init time, index time, exit codes)
+   - Index artifact sizes (.mcp-vector-search/ directory)
    - Known issues discovered and mitigations applied
    - Risk assessment and architectural decisions validated
 4. **scripts/verify-phase-1-0.sh** - Automated verification script for future engineers
@@ -85,11 +86,13 @@ Verify mcp-vector-search is properly installed, configured, and tested. Establis
 
 ---
 
-### 1.0.2: Install mcp-vector-search (2-4 hours) - CRITICAL BLOCKER
+### 1.0.2: Install mcp-vector-search CLI (2-4 hours) - CRITICAL BLOCKER
 
-**Objective**: Install mcp-vector-search library and verify all transitive dependencies
+**Objective**: Install mcp-vector-search CLI tool and verify it works as a subprocess
 
-**Note**: This is the longest single task in Phase 1.0 due to large dependency tree (~2.5GB). Model download (first run only) takes 2-3 minutes.
+**Note**: mcp-vector-search runs as a **subprocess** spawned by research-mind-service, NOT as an embedded Python library. The CLI is installed via pip but invoked via `subprocess.run()`. This is the longest single task in Phase 1.0 due to large dependency tree (~2.5GB). The embedding model (~250-500 MB) is downloaded on first `mcp-vector-search init` run.
+
+**Architecture Reference**: See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` for the subprocess-based integration pattern.
 
 #### Installation Steps
 
@@ -98,7 +101,7 @@ Verify mcp-vector-search is properly installed, configured, and tested. Establis
    ```toml
    [project]
    dependencies = [
-       "mcp-vector-search>=0.1.0",  # Pin to stable release
+       "mcp-vector-search>=0.1.0",  # Provides CLI tool, invoked as subprocess
        "fastapi>=0.104.0",
        "uvicorn>=0.24.0",
        "sqlalchemy>=2.0.0",
@@ -115,48 +118,97 @@ Verify mcp-vector-search is properly installed, configured, and tested. Establis
 
    Expected: 5-10 minutes depending on network speed and cache state
 
-3. **Verify Core Imports**
+3. **Verify CLI Installation** (NOT library imports)
 
-   ```python
-   python3 -c "
-   from mcp_vector_search import Client
-   from mcp_vector_search.indexing import SemanticIndexer
-   from mcp_vector_search.search import SearchEngine
-   print('✓ mcp-vector-search imports working')
-   "
+   ```bash
+   # Verify the CLI binary is available on PATH
+   which mcp-vector-search
+   # Expected: path to mcp-vector-search binary (e.g., .venv/bin/mcp-vector-search)
+
+   # Verify version
+   mcp-vector-search --version
+   # Expected: version number displayed
    ```
 
-4. **Verify Transitive Dependencies** (these must all be present for model to load)
+4. **Verify CLI Works in a Temp Directory** (subprocess invocation test)
+
+   ```bash
+   # Create a temporary workspace and test init + index
+   TEMP_DIR=$(mktemp -d)
+   echo "def hello(): pass" > "$TEMP_DIR/test.py"
+
+   # Test init (creates .mcp-vector-search/ directory)
+   mcp-vector-search init --force
+   # Run from temp dir context:
+   cd "$TEMP_DIR" && mcp-vector-search init --force
+   # Expected: exit code 0, .mcp-vector-search/ directory created
+
+   # Verify index artifacts exist
+   ls -la "$TEMP_DIR/.mcp-vector-search/"
+   # Expected: config.json, .chromadb/, and other artifacts
+
+   # Cleanup
+   rm -rf "$TEMP_DIR"
+   ```
+
+5. **Verify Subprocess Invocation from Python**
+
    ```python
-   python3 -c "
-   import torch
-   import transformers
-   from sentence_transformers import SentenceTransformer
-   import chromadb
-   print('✓ All transitive dependencies present')
-   print(f'  PyTorch version: {torch.__version__}')
-   print(f'  Transformers version: {transformers.__version__}')
-   print(f'  ChromaDB version: {chromadb.__version__}')
-   "
+   python3 << 'EOF'
+   import subprocess
+   import tempfile
+   from pathlib import Path
+
+   # Create temp workspace
+   with tempfile.TemporaryDirectory() as tmp:
+       # Create a test file
+       (Path(tmp) / "test.py").write_text("def hello(): pass\n")
+
+       # Test subprocess invocation (same pattern used by research-mind-service)
+       result = subprocess.run(
+           ["mcp-vector-search", "init", "--force"],
+           cwd=tmp,
+           timeout=30,
+           capture_output=True,
+           text=True
+       )
+       assert result.returncode == 0, f"Init failed: {result.stderr}"
+       assert (Path(tmp) / ".mcp-vector-search").exists(), "Index directory not created"
+       print("✓ mcp-vector-search CLI subprocess invocation working")
+       print(f"  Exit code: {result.returncode}")
+       print(f"  Index dir: {tmp}/.mcp-vector-search/")
+   EOF
    ```
 
 #### Expected Dependency Tree
 
 ```
-mcp-vector-search (0.1.0+)
+mcp-vector-search (0.1.0+)  ← Provides CLI binary
 ├── torch (~2.0 or higher) - ~600MB
 ├── transformers (~4.30+) - ~500MB
 ├── sentence-transformers (~2.2+) - ~200MB
-├── chromadb (~0.4+) - ~150MB
+├── chromadb (~0.4+) - ~150MB  ← Used internally by CLI
 ├── numpy
 ├── scikit-learn
 ├── pandas
 └── [other dependencies]
 
 Total: ~2.5GB of disk space
+Note: All dependencies are used by the CLI tool internally.
+      research-mind-service only uses Python's subprocess module to invoke the CLI.
 ```
 
 #### Troubleshooting
+
+**Problem**: `mcp-vector-search: command not found`
+**Solution**: Ensure the package is installed in the active virtual environment
+
+```bash
+pip install mcp-vector-search
+# Verify
+which mcp-vector-search
+mcp-vector-search --version
+```
 
 **Problem**: PyTorch installation fails due to missing compiler
 **Solution**: Ensure Xcode Command Line Tools installed (macOS) or build-essential (Linux)
@@ -177,20 +229,25 @@ pip install torch transformers sentence-transformers chromadb
 uv sync
 ```
 
-**Problem**: HuggingFace model download fails
-**Solution**: Set cache directory and retry
+**Problem**: Embedding model download fails on first `init`
+**Solution**: Ensure network access and disk space, then retry
 
 ```bash
-export HF_HOME=/tmp/hf_cache
-python3 -c "from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2')"
+# Check disk space (need 1GB+ free)
+df -h /path/to/workspace
+
+# Retry init
+mcp-vector-search init --force
 ```
 
 **Success Criteria**:
 
 - [ ] `uv sync` completes without errors
-- [ ] Core imports succeed (Client, SemanticIndexer, SearchEngine)
-- [ ] All transitive dependencies verified
-- [ ] pip freeze shows mcp-vector-search installed
+- [ ] `which mcp-vector-search` returns a valid path
+- [ ] `mcp-vector-search --version` displays version
+- [ ] `mcp-vector-search init --force` succeeds in a temp directory (exit code 0)
+- [ ] `.mcp-vector-search/` directory created after init
+- [ ] Python `subprocess.run()` invocation succeeds
 
 ---
 
@@ -319,103 +376,172 @@ SQLALCHEMY_ECHO=false  # Set to true for SQL debugging
 
 ---
 
-### 1.0.5: Test Model Caching (1-2 hours) - Proof of Concept
+### 1.0.5: Test Subprocess Model Download (1-2 hours) - Proof of Concept
 
-**Objective**: Verify embedding model can be downloaded and cached successfully
+**Objective**: Verify the mcp-vector-search CLI can download and cache the embedding model successfully via subprocess invocation
 
-**Rationale**: Model download happens first time mcp-vector-search is used. This is a one-time cost (~2-3 min) that must succeed reliably. We verify this works before Phase 1.1 starts.
+**Rationale**: The embedding model (~250-500 MB) is downloaded on first `mcp-vector-search init` run. This is a one-time cost (~2-5 min) that must succeed reliably. We verify this works before Phase 1.1 starts. The model is managed entirely by the mcp-vector-search subprocess -- research-mind-service does not load or manage models directly.
 
 #### Steps
 
-1. **Set HuggingFace Cache Environment Variables** (enables persistent caching)
-
-   ```bash
-   export TRANSFORMERS_CACHE=~/.cache/huggingface/transformers
-   export HF_HOME=~/.cache/huggingface
-   export HF_HUB_CACHE=~/.cache/huggingface/hub
-   ```
-
-2. **First Run: Download Embedding Model** (2-3 minutes on first run)
+1. **First Run: Initialize Workspace via Subprocess** (2-5 minutes on first run, includes model download)
 
    ```python
    python3 << 'EOF'
+   import subprocess
+   import tempfile
    import time
-   from sentence_transformers import SentenceTransformer
+   from pathlib import Path
 
-   # First run: downloads model from HuggingFace
-   start = time.time()
-   model = SentenceTransformer('all-MiniLM-L6-v2')
-   duration = time.time() - start
+   # Create a temp workspace with sample files
+   with tempfile.TemporaryDirectory() as tmp:
+       (Path(tmp) / "example.py").write_text("def hello(): return 'world'\n")
+       (Path(tmp) / "utils.py").write_text("def add(a, b): return a + b\n")
 
-   print(f"✓ Model loaded in {duration:.1f} seconds")
-   print(f"  First run is slower (downloads ~400MB)")
+       # First run: downloads embedding model (~250-500MB)
+       start = time.time()
+       result = subprocess.run(
+           ["mcp-vector-search", "init", "--force"],
+           cwd=tmp,
+           timeout=300,  # 5 min timeout for model download
+           capture_output=True,
+           text=True
+       )
+       duration = time.time() - start
 
-   # Test embedding
-   sentences = ["This is a test", "Second test sentence"]
-   embeddings = model.encode(sentences)
-   print(f"✓ Embeddings generated: shape {embeddings.shape}")
+       assert result.returncode == 0, f"Init failed: {result.stderr}"
+       print(f"✓ Init completed in {duration:.1f} seconds")
+       print(f"  First run is slower (downloads embedding model)")
+
+       # Verify artifacts created
+       index_dir = Path(tmp) / ".mcp-vector-search"
+       assert index_dir.exists(), "Index directory not created"
+       print(f"✓ Index directory created: {index_dir}")
+
+       # List artifacts
+       for item in index_dir.rglob("*"):
+           if item.is_file():
+               size_kb = item.stat().st_size / 1024
+               print(f"  {item.relative_to(index_dir)}: {size_kb:.1f} KB")
    EOF
    ```
 
-   Expected: ~2-3 minutes on first run, files cached in `~/.cache/huggingface/`
+   Expected: ~2-5 minutes on first run (model download), artifacts in `.mcp-vector-search/`
 
-3. **Second Run: Verify Cache Hit** (should be <1 second)
+2. **Second Run: Verify Model is Cached** (should be much faster)
 
    ```python
    python3 << 'EOF'
+   import subprocess
+   import tempfile
    import time
-   from sentence_transformers import SentenceTransformer
+   from pathlib import Path
 
-   # Second run: loads from cache (fast)
-   start = time.time()
-   model = SentenceTransformer('all-MiniLM-L6-v2')
-   duration = time.time() - start
+   with tempfile.TemporaryDirectory() as tmp:
+       (Path(tmp) / "example.py").write_text("def hello(): return 'world'\n")
 
-   print(f"✓ Model loaded in {duration:.3f} seconds")
-   print(f"  Cache hit! (model loaded from ~/.cache/huggingface/)")
+       # Second run: model already cached, should be faster
+       start = time.time()
+       result = subprocess.run(
+           ["mcp-vector-search", "init", "--force"],
+           cwd=tmp,
+           timeout=60,
+           capture_output=True,
+           text=True
+       )
+       duration = time.time() - start
+
+       assert result.returncode == 0, f"Init failed: {result.stderr}"
+       print(f"✓ Init completed in {duration:.1f} seconds")
+       print(f"  Model cached! (no download needed)")
    EOF
    ```
 
-   Expected: <1 second (loading from disk cache)
+   Expected: Significantly faster than first run (model loaded from cache)
 
-4. **Document Cache Performance Baseline** in PHASE_1_0_BASELINE.md:
-   - First run: 2-3 minutes + ~400MB download
-   - Subsequent runs: <100ms (in-memory cache)
-   - Cache location: `~/.cache/huggingface/`
-   - Critical for Phase 1.1 startup latency expectations
+3. **Test Full Index Cycle via Subprocess**
 
-#### Caching Architecture Pattern
+   ```python
+   python3 << 'EOF'
+   import subprocess
+   import tempfile
+   import time
+   from pathlib import Path
+
+   with tempfile.TemporaryDirectory() as tmp:
+       (Path(tmp) / "example.py").write_text("def hello(): return 'world'\n")
+       (Path(tmp) / "utils.py").write_text("def add(a, b): return a + b\n")
+
+       # Init
+       subprocess.run(
+           ["mcp-vector-search", "init", "--force"],
+           cwd=tmp, timeout=60, check=True
+       )
+
+       # Index
+       start = time.time()
+       result = subprocess.run(
+           ["mcp-vector-search", "index", "--force"],
+           cwd=tmp, timeout=60,
+           capture_output=True, text=True
+       )
+       duration = time.time() - start
+
+       assert result.returncode == 0, f"Index failed: {result.stderr}"
+       print(f"✓ Index completed in {duration:.1f} seconds")
+       print(f"  Exit code: {result.returncode}")
+   EOF
+   ```
+
+4. **Document Performance Baseline** in PHASE_1_0_BASELINE.md:
+   - First init (with model download): 2-5 minutes
+   - Subsequent init (model cached): ~2-5 seconds
+   - Index (2-file project): ~3-4 seconds
+   - Index artifacts size: 432-552 KB typical
+   - Model cache location: managed by mcp-vector-search internally
+
+#### Subprocess Architecture Pattern
 
 ```python
-# This pattern will be used in Phase 1.1's VectorSearchManager singleton
+# This pattern will be used in Phase 1.1's WorkspaceIndexer subprocess manager
+# See docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md for full implementation
 
-class VectorSearchManager:
-    _instance = None
-    _model = None  # Cached model, loaded once per process
+class WorkspaceIndexer:
+    """Manages mcp-vector-search subprocess for workspace indexing."""
 
-    @classmethod
-    def get_instance(cls):
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+    def __init__(self, workspace_dir: Path):
+        self.workspace_dir = Path(workspace_dir).resolve()
 
-    def __init__(self):
-        # Load model ONCE on first access (~30s on first run, cached after)
-        # Then reuse for all subsequent requests
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+    def initialize(self, timeout: int = 30) -> bool:
+        """Initialize workspace (one-time)."""
+        result = subprocess.run(
+            ["mcp-vector-search", "init", "--force"],
+            cwd=str(self.workspace_dir),
+            timeout=timeout,
+            capture_output=True,
+            text=True
+        )
+        return result.returncode == 0
 
-    def embed(self, text: str) -> np.ndarray:
-        # Subsequent calls use cached model (<1ms)
-        return self.model.encode(text)
+    def index(self, timeout: int = 60) -> bool:
+        """Index workspace."""
+        result = subprocess.run(
+            ["mcp-vector-search", "index", "--force"],
+            cwd=str(self.workspace_dir),
+            timeout=timeout,
+            capture_output=True,
+            text=True
+        )
+        return result.returncode == 0
 ```
 
 **Success Criteria**:
 
-- [ ] First run completes successfully (2-3 minutes)
-- [ ] Model downloads to cache directory
-- [ ] Second run <1 second (cache hit verified)
-- [ ] HuggingFace cache directory exists with model files
-- [ ] Embeddings can be generated and have correct shape
+- [ ] First subprocess init completes successfully (with model download)
+- [ ] `.mcp-vector-search/` directory created with artifacts
+- [ ] Second init is faster (model cached)
+- [ ] Full init + index cycle completes via subprocess
+- [ ] Exit codes are 0 for all successful operations
 - [ ] Performance baseline documented
 
 ---
@@ -684,20 +810,20 @@ This document captures the exact state of the development environment after Phas
 
 ### Architecture Risks (for Phase 1.1+)
 
-- [ ] Singleton ChromaDB manager thread safety
-- [ ] Per-session collection isolation
-- [ ] Model caching invalidation
-- [ ] Memory usage under load
+- [ ] Subprocess invocation reliability and timeout handling
+- [ ] Per-workspace index isolation via .mcp-vector-search/ directories
+- [ ] Subprocess model caching across workspaces
+- [ ] Concurrent subprocess management under load
 
 **Mitigation Strategy**: [Describe how risks will be mitigated in Phase 1.1-1.8]
 
 ## Verification Checklist
 
 - [x] Python 3.12+ installed
-- [x] mcp-vector-search installed and imports working
+- [x] mcp-vector-search CLI installed and subprocess invocation working
 - [x] All transitive dependencies present
 - [x] PostgreSQL running and migrations applied
-- [x] Model caching verified (2-3 min first run, <1s cached)
+- [x] Model download verified (first init 2-5 min, subsequent inits faster)
 - [x] Docker/docker-compose working
 - [x] app/sandbox/ directory structure created
 - [x] app/models/session.py stub created and imports
@@ -717,8 +843,8 @@ This document captures the exact state of the development environment after Phas
 
 **Assumptions for Phase 1.1**:
 
-- Python 3.12+, mcp-vector-search installed, PostgreSQL running
-- Model caching working (first run takes 2-3 min, cached runs <1s)
+- Python 3.12+, mcp-vector-search CLI installed, PostgreSQL running
+- Subprocess invocation working (init + index via subprocess.run())
 - Docker available for containerization
 - Session model stub ready for completion
 
@@ -757,14 +883,20 @@ fi
 echo "✓ Python 3.12+ verified"
 echo ""
 
-# mcp-vector-search
-echo "[2/8] mcp-vector-search imports..."
-python3 -c "from mcp_vector_search import Client; from mcp_vector_search.indexing import SemanticIndexer; from mcp_vector_search.search import SearchEngine" && echo "✓ mcp-vector-search imports working" || exit 1
+# mcp-vector-search CLI
+echo "[2/8] mcp-vector-search CLI installation..."
+which mcp-vector-search > /dev/null && echo "✓ mcp-vector-search CLI found at: $(which mcp-vector-search)" || { echo "✗ mcp-vector-search CLI not found"; exit 1; }
+mcp-vector-search --version && echo "✓ mcp-vector-search version verified" || { echo "✗ mcp-vector-search --version failed"; exit 1; }
 echo ""
 
-# Transitive dependencies
-echo "[3/8] Transitive dependencies..."
-python3 -c "import torch, transformers, chromadb; from sentence_transformers import SentenceTransformer" && echo "✓ All transitive dependencies present" || exit 1
+# mcp-vector-search subprocess test
+echo "[3/8] mcp-vector-search subprocess invocation..."
+TEMP_DIR=$(mktemp -d)
+echo "def test(): pass" > "$TEMP_DIR/test.py"
+cd "$TEMP_DIR" && mcp-vector-search init --force > /dev/null 2>&1 && echo "✓ mcp-vector-search init succeeds (exit code 0)" || { echo "✗ mcp-vector-search init failed"; rm -rf "$TEMP_DIR"; exit 1; }
+[ -d "$TEMP_DIR/.mcp-vector-search" ] && echo "✓ .mcp-vector-search/ directory created" || { echo "✗ Index directory not created"; rm -rf "$TEMP_DIR"; exit 1; }
+rm -rf "$TEMP_DIR"
+cd - > /dev/null
 echo ""
 
 # PostgreSQL
@@ -807,10 +939,10 @@ echo "✓ All checks passed - Ready for Phase 1.1"
 
 Document addressing 5+ common issues:
 
-1. **PyTorch Installation Fails** - compiler not found
-2. **HuggingFace Model Download Times Out** - network or disk space
+1. **`mcp-vector-search: command not found`** - CLI not installed or not on PATH
+2. **Embedding Model Download Fails on First Init** - network or disk space
 3. **PostgreSQL Connection Refused** - not running
-4. **mcp-vector-search Imports Fail** - missing transitive dependency
+4. **Subprocess Init Returns Exit Code 1** - permission denied or invalid directory
 5. **Docker Daemon Not Running** - startup issue
 6. **Out of Memory During pip install** - insufficient RAM
 
@@ -830,13 +962,13 @@ Document addressing 5+ common issues:
 
 ### Primary References
 
-- **docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md** (Sections 1-5)
+- **docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md** (v2.0, Subprocess-Based)
 
-  - Section 1: Phase 1.0 Pre-Phase Overview (exactly parallels this document)
-  - Section 3: Critical Integration Patterns (singleton, caching, session scoping)
-  - Section 4: Architecture Design with code templates
-  - Section 5: Environment Setup and Configuration
-  - Section 6: Pre-Phase Verification Checklist (maps to acceptance criteria)
+  - Architecture Overview: Subprocess-based indexing design pattern
+  - CLI Command Reference: init, index, reindex commands
+  - Subprocess Invocation Pattern: Python subprocess.run() examples
+  - Python Integration Examples: WorkspaceIndexer class implementation
+  - Error Handling & Recovery: Exit codes, timeouts, common errors
 
 - **docs/research2/IMPLEMENTATION_PLAN_ANALYSIS.md** (Section 2)
 
@@ -869,8 +1001,9 @@ All criteria must be met before Phase 1.1 can begin:
 ### Critical Path Items (MUST COMPLETE)
 
 - [ ] Python 3.12+ installed and verified
-- [ ] mcp-vector-search installed via `uv sync` (no import errors)
-- [ ] Model download works (first run 2-3 min, cached runs <1s)
+- [ ] mcp-vector-search CLI installed (`which mcp-vector-search` and `mcp-vector-search --version`)
+- [ ] CLI subprocess invocation works (`mcp-vector-search init --force` in temp dir, exit code 0)
+- [ ] Model download works (first init with model download completes)
 - [ ] PostgreSQL running and migrations applied
 - [ ] All expected database tables created
 - [ ] Docker and docker-compose installed and verified
@@ -903,14 +1036,15 @@ All criteria must be met before Phase 1.1 can begin:
 **Prerequisites for Gate 1**:
 
 - [ ] `uv sync` completes without errors
-- [ ] Core imports work (Client, SemanticIndexer, SearchEngine)
-- [ ] All transitive dependencies installed
+- [ ] `which mcp-vector-search` returns valid path
+- [ ] `mcp-vector-search --version` displays version
+- [ ] `mcp-vector-search init --force` succeeds in temp directory (exit code 0)
 
 **Go/No-Go Decision**:
 
-- **GO**: All imports successful, no dependency conflicts
-- **NO-GO**: Missing dependencies, import failures, or major version conflicts
-  - **Resolution**: Debug dependency issues, document workarounds, re-run until GO
+- **GO**: CLI installed, subprocess invocation successful, no dependency conflicts
+- **NO-GO**: CLI not found, subprocess failures, or major version conflicts
+  - **Resolution**: Debug installation issues, document workarounds, re-run until GO
 
 **Owner**: Backend engineer
 **Approver**: Tech lead (if blocker)
@@ -939,9 +1073,9 @@ All criteria must be met before Phase 1.1 can begin:
 
 ## Risks & Mitigations
 
-### Risk 1: mcp-vector-search Installation Failure (CRITICAL)
+### Risk 1: mcp-vector-search CLI Installation Failure (CRITICAL)
 
-**Description**: Dependency installation fails due to conflicting packages or missing system dependencies (compiler, system libraries)
+**Description**: CLI installation fails due to conflicting packages or missing system dependencies (compiler, system libraries)
 
 **Probability**: Medium (2.5GB dependency tree with PyTorch, transformers, large downloads)
 
@@ -950,8 +1084,8 @@ All criteria must be met before Phase 1.1 can begin:
 **Detection**:
 
 - `uv sync` fails with dependency conflict error
-- Import errors when testing core imports
-- Build failures in PyTorch/transformers compilation
+- `which mcp-vector-search` returns nothing
+- `mcp-vector-search init --force` returns non-zero exit code
 
 **Mitigation Strategies**:
 
@@ -973,13 +1107,13 @@ All criteria must be met before Phase 1.1 can begin:
 
 **Probability**: Low-Medium (network timeout, disk space issue, HuggingFace rate limiting)
 
-**Impact**: Model caching cannot be verified, blocking Phase 1.1's VectorSearchManager design
+**Impact**: Subprocess init cannot complete, blocking Phase 1.1's WorkspaceIndexer subprocess manager design
 
 **Detection**:
 
-- Task 1.0.5 fails when attempting first model load
-- Network timeout or disk full error during `SentenceTransformer()` initialization
-- HuggingFace 429 (rate limit) or 503 (service unavailable) errors
+- Task 1.0.5 fails when attempting first `mcp-vector-search init`
+- Subprocess timeout or disk full error during init
+- HuggingFace 429 (rate limit) or 503 (service unavailable) errors in subprocess stderr
 
 **Mitigation Strategies**:
 
@@ -1080,7 +1214,7 @@ All criteria must be met before Phase 1.1 can begin:
 
 ### Internal Dependencies (Phase 1.0 creates/enables)
 
-- mcp-vector-search library (enables Phase 1.1)
+- mcp-vector-search CLI subprocess (enables Phase 1.1)
 - Database migrations (enables Phase 1.2)
 - app/sandbox/ directory (enables Phase 1.4)
 - Session model stub (enables Phase 1.2)
@@ -1101,14 +1235,14 @@ Phase 1.2-1.8: All remaining Phase 1 subphases
 
 ### Quantitative Metrics
 
-| Metric                      | Target    | Measurement                                                |
-| --------------------------- | --------- | ---------------------------------------------------------- |
-| Installation Time           | 2-3 hours | Wall-clock time from start to `uv sync` completion         |
-| mcp-vector-search Imports   | 100%      | All 3 core imports succeed without errors                  |
-| Model Load Time (First Run) | 2-3 min   | Time from first `SentenceTransformer()` call to completion |
-| Model Load Time (Cached)    | <100ms    | Time from import to initialization with cached model       |
-| Disk Space Required         | 2.5GB     | Total of dependencies + model + caches                     |
-| Verification Tests          | 100% pass | All 8 verification steps in verify-phase-1-0.sh pass       |
+| Metric                      | Target    | Measurement                                              |
+| --------------------------- | --------- | -------------------------------------------------------- |
+| Installation Time           | 2-3 hours | Wall-clock time from start to `uv sync` completion       |
+| CLI Verification            | 100%      | `which mcp-vector-search` and `--version` succeed        |
+| Subprocess Init (First Run) | 2-5 min   | First `mcp-vector-search init` (includes model download) |
+| Subprocess Init (Cached)    | 2-5 sec   | Subsequent `mcp-vector-search init` (model cached)       |
+| Disk Space Required         | 2.5GB     | Total of dependencies + model + caches                   |
+| Verification Tests          | 100% pass | All 8 verification steps in verify-phase-1-0.sh pass     |
 
 ### Qualitative Metrics
 
@@ -1126,9 +1260,9 @@ Phase 1.2-1.8: All remaining Phase 1 subphases
 
 **Phase 1.0** is a critical 2-3 day pre-phase that de-risks Phase 1.1-1.8 by:
 
-1. **Installing mcp-vector-search** (~2.5GB) and verifying all dependencies work
-2. **Establishing integration patterns** (singleton ChromaDB, model caching, session scoping)
-3. **Validating architecture decisions** through proof-of-concept implementations
+1. **Installing mcp-vector-search CLI** (~2.5GB) and verifying subprocess invocation works
+2. **Establishing integration patterns** (subprocess-based indexing, workspace isolation, exit code handling)
+3. **Validating architecture decisions** through subprocess proof-of-concept
 4. **Documenting baseline environment** for team reference and troubleshooting
 5. **Creating verification automation** for future engineers
 

@@ -15,6 +15,8 @@
 
 Implement infrastructure-level path validation preventing directory traversal and unauthorized access. This is the first layer of defense protecting session isolation and preventing agents from escaping sandbox constraints.
 
+**Critical for Subprocess Architecture**: Path validation is MORE important under the subprocess-based mcp-vector-search integration because `subprocess.run()` uses a `cwd` parameter with the workspace path. The path validator MUST validate workspace paths BEFORE they are passed to subprocess invocations. Without this, a malicious workspace path could cause the subprocess to operate in an unintended directory (directory traversal via `cwd` parameter).
+
 **Success Definition**:
 
 - All path traversal attempts blocked (100% detection rate)
@@ -22,6 +24,7 @@ Implement infrastructure-level path validation preventing directory traversal an
 - System paths blocked (/etc, /root, /home/_/._)
 - Session ID validation on every request
 - Audit logging of all blocked attempts
+- Workspace paths validated before passing to subprocess `cwd` parameter
 
 ---
 
@@ -121,6 +124,11 @@ class PathValidator:
 
         Args:
             session_workspace: Session's root workspace directory
+
+        Note: This validator MUST be called before passing workspace paths
+        to subprocess.run(cwd=...) for mcp-vector-search subprocess invocations.
+        The cwd parameter controls where the subprocess operates, so an
+        unvalidated path could lead to directory traversal attacks.
         """
         self.session_workspace = Path(session_workspace).resolve()
         logger.info(f"PathValidator initialized for: {self.session_workspace}")
@@ -351,9 +359,11 @@ class TestPathTraversalAttacks:
 - Code examples for implementation
 - Security testing recommendations
 
-**docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md** (Section 5)
+**docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md** (v2.0, Subprocess-Based)
 
-- Sandbox directory setup for path validator
+- Subprocess invocation pattern uses `cwd` parameter with workspace path
+- Path validation is critical before passing paths to `subprocess.run(cwd=...)`
+- See FastAPI integration example for sandbox path validation before subprocess spawn
 
 ---
 
@@ -366,6 +376,7 @@ class TestPathTraversalAttacks:
 - [ ] Session validation middleware working
 - [ ] All security tests passing
 - [ ] Fuzzing tests with 20+ attack patterns
+- [ ] Workspace paths validated before subprocess `cwd` parameter usage
 
 ---
 
@@ -376,7 +387,8 @@ class TestPathTraversalAttacks:
 - Infrastructure-level path validation
 - Middleware for session validation on every request
 - Comprehensive security testing
-- Foundation for Phase 1.6 agent isolation
+- Validation of workspace paths before mcp-vector-search subprocess invocation
+- Foundation for Phase 1.6 agent isolation (deferred to Phase 2)
 
 This is CRITICAL for preventing data exfiltration and cross-session contamination.
 

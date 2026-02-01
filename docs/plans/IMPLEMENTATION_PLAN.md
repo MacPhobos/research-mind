@@ -1,9 +1,18 @@
 # Research-Mind Implementation Plan
 
-**Last Updated**: 2026-01-31
-**Status**: GO - Architecture sound, ready for implementation
+> **REFERENCE ONLY** - This plan has been superseded by individual phase documents in `docs/plans/`.
+> See `IMPLEMENTATION_ROADMAP.md` for the current master index and timeline.
+>
+> **CRITICAL ARCHITECTURE UPDATE (2026-02-01)**: mcp-vector-search is integrated as a
+> **subprocess** spawned by research-mind-service, NOT as an embedded Python library.
+> The original plan below assumed library embedding, which is incorrect.
+> See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) for the definitive
+> subprocess-based integration approach.
+
+**Last Updated**: 2026-02-01
+**Status**: REFERENCE ONLY - See individual phase plans for current approach
 **Timeline**: 12 weeks to production (MVP in 15-21 days with Phase 1.0 setup)
-**Revision**: Updated with Phase 1.0 pre-phase setup and realistic timeline (see MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md)
+**Revision**: Updated with subprocess-based architecture note. Original library embedding assumptions preserved below for historical reference.
 
 ## Executive Summary
 
@@ -45,11 +54,14 @@ Build minimal end-to-end flow: create session → index content → search → a
 
 ### Critical Dependencies
 
-- mcp-vector-search library (as Python package, not CLI)
+> **UPDATED**: mcp-vector-search is a CLI tool invoked as a subprocess, not an embedded library.
+> See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) for correct integration.
+
+- mcp-vector-search CLI (installed via pip, invoked as subprocess via `subprocess.run()`)
 - claude-ppm installation (requires Claude CLI v2.1.3+)
 - FastAPI service scaffold
 - SQLite for session storage
-- ChromaDB (included in mcp-vector-search)
+- ChromaDB (used internally by mcp-vector-search subprocess, not managed by service)
 
 ---
 
@@ -117,23 +129,25 @@ Build minimal end-to-end flow: create session → index content → search → a
 
 ### Critical Integration Patterns Established in Phase 1.0
 
-**Pattern 1: Singleton ChromaDB Manager**
+> **UPDATED**: Patterns revised for subprocess-based architecture.
 
-- Load model ONCE per service startup (~30s first run)
-- Reuse in-memory for all requests (<1ms subsequent)
+**Pattern 1: WorkspaceIndexer Subprocess Manager**
+
+- Spawn mcp-vector-search CLI subprocess per workspace
+- Use `subprocess.run()` with `cwd` parameter for workspace targeting
 - Foundation for Phase 1.1 implementation
 
-**Pattern 2: Session-Scoped Collections**
+**Pattern 2: Per-Workspace Index Isolation**
 
-- Each session gets isolated ChromaDB collection: `session_{session_id}`
-- Shared ChromaDB instance, isolated collections
-- Verified in Phase 1.0 concurrent access testing
+- Each workspace gets independent `.mcp-vector-search/` directory
+- No shared state between workspaces
+- Verified in Phase 1.0 subprocess invocation testing
 
-**Pattern 3: Model Caching**
+**Pattern 3: Subprocess Model Caching**
 
-- HuggingFace cache via environment variables
-- TRANSFORMERS_CACHE, HF_HOME, HF_HUB_CACHE
-- Avoids re-downloading 400MB model on subsequent runs
+- Embedding model cached internally by mcp-vector-search
+- First `init` downloads model (~250-500 MB)
+- Subsequent inits reuse cached model
 
 ### Phase 1.0 Success Criteria
 
@@ -156,8 +170,10 @@ Build minimal end-to-end flow: create session → index content → search → a
 
 ### Risk Mitigations Established in Phase 1.0
 
-- ✅ Concurrent ChromaDB access verified (safe for per-session collections)
-- ✅ Model caching performance proven
+> **UPDATED**: Risk mitigations revised for subprocess-based architecture.
+
+- ✅ Subprocess invocation verified (init + index via subprocess.run())
+- ✅ Multi-workspace parallel indexing safe (independent .mcp-vector-search/ dirs)
 - ✅ Environment setup documented (prevent Phase 1.1 surprises)
 - ✅ Installation issues discovered and mitigated
 - ✅ Realistic timeline adjustments made (10-12 → 15-21 days)
@@ -1048,15 +1064,22 @@ Phase 4 (Operations/Scale)
 
 ### Decision 1: mcp-vector-search as Library vs. CLI
 
-- **Choice**: Library (imported in Python)
-- **Rationale**: Better control, session scoping, lower overhead
-- **Trade-off**: Need to manage ChromaDB instance directly
+> **SUPERSEDED**: Research confirmed mcp-vector-search CANNOT be embedded as a library.
+> It runs as a CLI subprocess. See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0).
 
-### Decision 2: Per-Session ChromaDB Collections vs. Separate Instances
+- **Original Choice**: Library (imported in Python) -- **INCORRECT**
+- **Revised Choice**: CLI subprocess (spawned via `subprocess.run()`)
+- **Rationale**: mcp-vector-search is designed as a CLI tool; per-workspace isolation via `cwd` parameter
+- **Trade-off**: Subprocess overhead per invocation, but cleaner isolation and no shared state
 
-- **Choice**: Collections in shared instance
-- **Rationale**: Lower memory overhead, easier management
-- **Trade-off**: Requires strict middleware validation (mitigated by Phase 1.4)
+### Decision 2: Per-Session ChromaDB Collections vs. Per-Workspace Index Directories
+
+> **SUPERSEDED**: Each workspace has its own `.mcp-vector-search/` directory with independent ChromaDB index.
+
+- **Original Choice**: Collections in shared instance -- **SUPERSEDED**
+- **Revised Choice**: Per-workspace `.mcp-vector-search/` directories (automatic with subprocess approach)
+- **Rationale**: Subprocess `cwd` determines workspace; each workspace is fully independent
+- **Trade-off**: More disk usage, but zero cross-workspace contamination risk
 
 ### Decision 3: Infrastructure-Level Sandbox vs. Prompt-Based
 
@@ -1076,11 +1099,11 @@ Phase 4 (Operations/Scale)
 
 ### Immediate Actions (Before Phase 1.0)
 
-1. **Review Phase 1.0 Guide**: Read `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (3,600+ lines)
-2. **Approval Gate**: Team reviews PLAN_VS_RESEARCH_ANALYSIS.md findings and Phase 1.0 timeline
+1. **Review Subprocess Integration Guide**: Read `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0, subprocess-based)
+2. **Approval Gate**: Team reviews research findings and Phase 1.0 timeline
 3. **Execute Phase 1.0**: Run pre-phase environment setup (2-3 days)
-   - Install mcp-vector-search (~2.5GB)
-   - Verify all dependencies
+   - Install mcp-vector-search CLI (~2.5GB)
+   - Verify subprocess invocation (`mcp-vector-search init --force`)
    - Run verification script
    - Create PHASE_1_0_BASELINE.md
    - Sign off on findings
@@ -1102,12 +1125,14 @@ Phase 4 (Operations/Scale)
 
 ### Key Documents & Resources
 
-- **MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md**: Complete Phase 1.0 setup with code templates
-- **PLAN_VS_RESEARCH_ANALYSIS.md**: Gap analysis and justification for timeline changes
+- **docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md** (v2.0): Subprocess-based integration guide with code templates
+- **docs/research2/RESEARCH_SUMMARY.md**: Quick reference of research findings
+- **IMPLEMENTATION_ROADMAP.md**: Master index and timeline (supersedes this document)
 - **PHASE_1_0_BASELINE.md**: (To be created during Phase 1.0) Environment documentation
 
 ---
 
-**Document Status**: Complete
-**Review Date**: 2026-01-31
+**Document Status**: REFERENCE ONLY - Superseded by individual phase documents in docs/plans/
+**Review Date**: 2026-02-01
+**Architecture Update**: Subprocess-based mcp-vector-search integration (see docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md v2.0)
 **Next Review**: After Phase 1 MVP completion

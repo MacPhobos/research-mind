@@ -8,7 +8,9 @@
 
 ## Executive Summary
 
-This roadmap outlines the complete 12-week path from MVP to production for research-mind, a session-scoped agentic research system combining semantic code search (mcp-vector-search) with Claude agent analysis (claude-ppm).
+This roadmap outlines the complete 12-week path from MVP to production for research-mind, a session-scoped agentic research system combining semantic code indexing (mcp-vector-search, subprocess-based) with Claude agent analysis (claude-ppm).
+
+**Architecture Note**: mcp-vector-search is integrated as a **subprocess** spawned by research-mind-service, NOT as an embedded Python library. See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) for the definitive integration approach.
 
 **Key Metrics**:
 
@@ -33,7 +35,7 @@ Week 1-3: Phase 1 Foundation (MVP Core Research Loop) - 12-16 days
 │
 ├─ Days 1-6: Phase 1.1 Service Architecture (5-6 days, BLOCKING)
 │   ├─ FastAPI scaffold
-│   ├─ VectorSearchManager singleton
+│   ├─ WorkspaceIndexer subprocess manager
 │   ├─ Configuration system
 │   └─ Docker multi-stage build
 │
@@ -43,10 +45,10 @@ Week 1-3: Phase 1 Foundation (MVP Core Research Loop) - 12-16 days
 │   │   ├─ Database schema
 │   │   └─ Workspace initialization
 │   │
-│   ├─ Phase 1.3: Vector Search REST API (5-6 days)
-│   │   ├─ SessionIndexer wrapper
+│   ├─ Phase 1.3: Indexing Operations (5-6 days)
+│   │   ├─ Subprocess invocation (init + index)
 │   │   ├─ Indexing endpoints
-│   │   └─ Search endpoints
+│   │   └─ Search deferred to Phase 2
 │   │
 │   └─ Phase 1.4: Path Validator (2-3 days)
 │       ├─ Path validation logic
@@ -57,10 +59,10 @@ Week 1-3: Phase 1 Foundation (MVP Core Research Loop) - 12-16 days
 │   │   ├─ AuditLog model
 │   │   └─ Logging integration
 │   │
-│   └─ Phase 1.6: Agent Integration (5-7 days)
-│       ├─ research-analyst agent
-│       ├─ Agent runner
-│       └─ Analysis endpoint
+│   └─ Phase 1.6: Agent Integration (DEFERRED to Phase 2)
+│       ├─ Depends on search functionality (Phase 2)
+│       ├─ Depends on Claude Code MCP integration
+│       └─ Placeholder only in Phase 1
 │
 ├─ Days 13-20: Phase 1.7, 1.8 (sequential)
 │   ├─ Phase 1.7: Integration Tests (5-7 days)
@@ -150,10 +152,10 @@ Week 13+: Operations & Continuous Improvement
 
 1. **00-PHASE_1_0_ENVIRONMENT_SETUP.md** (70 KB, 2,000+ lines)
 
-   - Pre-phase setup for mcp-vector-search installation
+   - Pre-phase setup for mcp-vector-search CLI installation
    - 8 detailed tasks with hour estimates
    - Critical for de-risking Phase 1.1
-   - Reference: MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md
+   - Reference: MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md (v2.0, subprocess-based)
 
 2. **01-PHASE_1_FOUNDATION.md** (50 KB, 1,500+ lines)
    - Phase 1 overview with critical path analysis
@@ -165,8 +167,8 @@ Week 13+: Operations & Continuous Improvement
 
 3. **01_1_1-SERVICE_ARCHITECTURE.md** (35 KB, 1,000+ lines)
 
-   - FastAPI scaffold with VectorSearchManager singleton
-   - Reference: MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md Section 4
+   - FastAPI scaffold with WorkspaceIndexer subprocess manager
+   - Reference: MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md (v2.0, subprocess-based)
    - 6 detailed tasks with code templates
 
 4. **01_1_2-SESSION_MANAGEMENT.md** (30 KB, 900+ lines)
@@ -175,11 +177,11 @@ Week 13+: Operations & Continuous Improvement
    - Reference: mcp-vector-search-rest-api-proposal.md Section 2.1
    - 7 detailed tasks covering model, schema, routes, service
 
-5. **01_1_3-VECTOR_SEARCH_API.md** (35 KB, 1,000+ lines)
+5. **01_1_3-INDEXING_OPERATIONS.md** (35 KB, 1,000+ lines)
 
-   - SessionIndexer wrapper around mcp-vector-search
-   - Reference: mcp-vector-search-rest-api-proposal.md Sections 2.2-2.3
-   - Per-session indexing and search with isolation
+   - Subprocess-based workspace indexing operations
+   - Reference: MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md (v2.0, subprocess-based)
+   - Per-workspace indexing via subprocess, search deferred to Phase 2
 
 6. **01_1_4-PATH_VALIDATOR.md** (20 KB, 600+ lines)
 
@@ -195,8 +197,8 @@ Week 13+: Operations & Continuous Improvement
 
 8. **01_1_6-AGENT_INTEGRATION.md** (30 KB, 900+ lines)
 
-   - Custom research-analyst agent
-   - Agent runner with subprocess isolation
+   - Custom research-analyst agent (DEFERRED to Phase 2)
+   - Depends on search functionality and Claude Code MCP integration
    - Reference: claude-ppm-capabilities.md Sections 3-5
 
 9. **01_1_7-INTEGRATION_TESTS.md** (25 KB, 750+ lines)
@@ -249,21 +251,24 @@ Week 13+: Operations & Continuous Improvement
 
 **MVP (Phase 1) Critical Path**:
 
+**Note**: Phase 1 uses subprocess-based mcp-vector-search integration. Phase 1.6 (Agent Integration) is deferred to Phase 2. Search functionality is also deferred to Phase 2.
+
 ```
-Phase 1.0 (2-3 days)
+Phase 1.0 (2-3 days) - CLI installation and subprocess verification
   ↓ (CRITICAL BLOCKER)
-Phase 1.1 (5-6 days)
+Phase 1.1 (5-6 days) - Service architecture with WorkspaceIndexer subprocess manager
   ↓
 Phase 1.2/1.3/1.4 (can parallel, longest is 1.3 @ 5-6 days)
-  ↓
-Phase 1.5/1.6 (can parallel after dependencies)
-  ↓
-Phase 1.7 (5-7 days, security testing is longest)
+  ↓                  1.3 = Indexing Operations (subprocess-based)
+Phase 1.5 (2-3 days, audit logging with subprocess events)
+  ↓                  1.6 = DEFERRED to Phase 2
+Phase 1.7 (5-7 days, subprocess + security testing)
   ↓
 Phase 1.8 (2 days)
 
-TOTAL: Phase 1.0 (2-3) + 1.1 (5-6) + 1.3 (5-6) + 1.6 (5-7) + 1.7 (5-7) + 1.8 (2)
-     = 25-31 calendar days to MVP (3.5-4.5 weeks including Phase 1.0)
+TOTAL: Phase 1.0 (2-3) + 1.1 (5-6) + 1.3 (5-6) + 1.5 (2-3) + 1.7 (5-7) + 1.8 (2)
+     = 22-27 calendar days to MVP (3-4 weeks including Phase 1.0)
+     (Reduced from 25-31 days due to deferral of Phase 1.6 Agent Integration)
 ```
 
 **Production Critical Path**:
@@ -288,8 +293,8 @@ TOTAL: 12-13 weeks to production
 
 **Prerequisites**:
 
-- mcp-vector-search installed and verified
-- Model caching validated
+- mcp-vector-search CLI installed and subprocess invocation verified
+- Model download validated via subprocess init
 - PostgreSQL running and migrations applied
 - All 8 Phase 1.0 tasks complete
 
@@ -303,7 +308,7 @@ TOTAL: 12-13 weeks to production
 **Prerequisites**:
 
 - FastAPI service running on port 15010
-- VectorSearchManager singleton working
+- WorkspaceIndexer subprocess manager working
 - Health check endpoint responding
 - Docker image builds successfully
 
@@ -432,7 +437,7 @@ TOTAL: 12-13 weeks to production
 
 **Phase 1.0**:
 
-- docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md (3,600+ lines)
+- docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md (v2.0, subprocess-based)
 - docs/research/mcp-vector-search-packaging-installation.md (1,388 lines)
 
 **Phase 1.1-1.8**:
@@ -461,8 +466,9 @@ TOTAL: 12-13 weeks to production
 - **Total**: 2 FTE engineers
 - **Distribution**:
   - Engineer A: Phase 1.1, 1.2, 1.5 (service architecture, sessions, audit)
-  - Engineer B: Phase 1.3, 1.4, 1.6 (search, security, agent integration)
+  - Engineer B: Phase 1.3, 1.4 (indexing operations, security)
   - Both: Phase 1.7 (integration testing), Phase 1.8 (documentation)
+  - Phase 1.6 (Agent Integration): Deferred to Phase 2
 
 ### Phase 2 (Optimization)
 
@@ -546,7 +552,7 @@ research-mind-project/
 │   │   ├── 01-PHASE_1_FOUNDATION.md
 │   │   ├── 01_1_1-SERVICE_ARCHITECTURE.md
 │   │   ├── 01_1_2-SESSION_MANAGEMENT.md
-│   │   ├── 01_1_3-VECTOR_SEARCH_API.md
+│   │   ├── 01_1_3-INDEXING_OPERATIONS.md  (renamed from VECTOR_SEARCH_API)
 │   │   ├── 01_1_4-PATH_VALIDATOR.md
 │   │   ├── 01_1_5-AUDIT_LOGGING.md
 │   │   ├── 01_1_6-AGENT_INTEGRATION.md
@@ -597,9 +603,9 @@ research-mind-project/
 
 ---
 
-**Document Version**: 1.0
-**Status**: READY FOR EXECUTION
-**Last Updated**: 2026-01-31
+**Document Version**: 1.1
+**Status**: READY FOR EXECUTION (Updated for subprocess-based architecture)
+**Last Updated**: 2026-02-01
 **Next Review**: Phase 1.0 gate completion
 **Maintained By**: Research-Mind Development Team
 
@@ -609,7 +615,7 @@ research-mind-project/
 
 - [Phase 1.0 Setup](00-PHASE_1_0_ENVIRONMENT_SETUP.md) - Start here for environment
 - [Phase 1 Overview](01-PHASE_1_FOUNDATION.md) - MVP architecture and dependencies
-- [Phase 1.1 Service](01_1_1-SERVICE_ARCHITECTURE.md) - FastAPI and VectorSearchManager
+- [Phase 1.1 Service](01_1_1-SERVICE_ARCHITECTURE.md) - FastAPI and WorkspaceIndexer subprocess manager
 - [Original Plan](IMPLEMENTATION_PLAN.md) - Complete reference document
 
 For questions or updates, refer to the research documents or contact tech lead.

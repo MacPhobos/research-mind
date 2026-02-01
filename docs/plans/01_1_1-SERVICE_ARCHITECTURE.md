@@ -5,20 +5,24 @@
 **Effort**: 40-48 hours
 **Team Size**: 2 FTE engineers
 **Blocking**: 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8 (all subsequent phases)
-**Prerequisite**: Phase 1.0 complete (mcp-vector-search installed)
+**Prerequisite**: Phase 1.0 complete (mcp-vector-search CLI installed)
 **Status**: CRITICAL - Unblocks all other Phase 1 work
+
+> **ARCHITECTURE NOTE (v2.0)**: This document reflects the subprocess-based architecture.
+> mcp-vector-search runs as a CLI subprocess, NOT as an embedded Python library.
+> See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) for details.
 
 ---
 
 ## Subphase Objective
 
-Create FastAPI service scaffold with proper project structure and mcp-vector-search integration. Implement VectorSearchManager singleton that loads embedding model once per startup and caches for all subsequent requests.
+Create FastAPI service scaffold with proper project structure and subprocess-based workspace indexing. Implement WorkspaceIndexer class that spawns `mcp-vector-search` CLI as a subprocess for workspace initialization and indexing operations.
 
 **Success Definition**: FastAPI service running on port 15010 with:
 
 - Health check endpoint working (`GET /api/health`)
-- VectorSearchManager singleton initialized on startup
-- Embedding model loaded (30s first run, cached afterward)
+- WorkspaceIndexer class operational (spawns subprocess correctly)
+- `mcp-vector-search` CLI verified accessible from service environment
 - All environment variables configurable
 - Docker image builds successfully
 - Service can start and shutdown cleanly
@@ -34,13 +38,13 @@ Create FastAPI service scaffold with proper project structure and mcp-vector-sea
 - Configure middleware and error handling
 - Implement health check endpoint
 
-### Day 3-4: VectorSearchManager Singleton (12-16 hours)
+### Day 3-4: WorkspaceIndexer Subprocess Manager (12-16 hours)
 
-- Design singleton pattern
-- Integrate mcp-vector-search library
-- Implement model caching strategy
-- Add startup/shutdown hooks
-- Test model loading performance
+- Design WorkspaceIndexer class using subprocess.run()
+- Implement init + index two-step flow
+- Add timeout management (30s init, 60s index, 300-600s large projects)
+- Add exit code handling and error recovery
+- Test subprocess invocation patterns
 
 ### Day 5-6: Configuration & Deployment (12-16 hours)
 
@@ -63,11 +67,11 @@ Create FastAPI service scaffold with proper project structure and mcp-vector-sea
    - Startup/shutdown hooks
    - Health check endpoint
 
-2. **research-mind-service/app/core/vector_search.py** (200-300 lines)
+2. **research-mind-service/app/core/workspace_indexer.py** (200-300 lines)
 
-   - VectorSearchManager singleton implementation
-   - Lazy model loading
-   - Error handling and recovery
+   - WorkspaceIndexer subprocess manager
+   - Subprocess invocation with timeout and exit code handling
+   - Error handling and recovery patterns
 
 3. **research-mind-service/app/core/config.py** (80-120 lines)
 
@@ -78,12 +82,12 @@ Create FastAPI service scaffold with proper project structure and mcp-vector-sea
 4. **research-mind-service/Dockerfile** (40-60 lines)
 
    - Multi-stage build
-   - PyTorch and transformers included
+   - mcp-vector-search CLI installed
    - Proper cache management
 
 5. **research-mind-service/pyproject.toml** (updated)
 
-   - mcp-vector-search dependency
+   - mcp-vector-search dependency (for CLI availability)
    - FastAPI, uvicorn, SQLAlchemy, Pydantic dependencies
    - Development dependencies (pytest, black, mypy)
 
@@ -97,11 +101,11 @@ Create FastAPI service scaffold with proper project structure and mcp-vector-sea
    research-mind-service/
    ├── app/
    │   ├── __init__.py
-   │   ├── main.py                 # FastAPI entry point (NEW)
+   │   ├── main.py                    # FastAPI entry point (NEW)
    │   ├── core/
    │   │   ├── __init__.py
-   │   │   ├── vector_search.py   # VectorSearchManager (NEW)
-   │   │   └── config.py          # Configuration (NEW)
+   │   │   ├── workspace_indexer.py   # WorkspaceIndexer subprocess manager (NEW)
+   │   │   └── config.py             # Configuration (NEW)
    │   ├── routes/
    │   │   └── __init__.py
    │   ├── services/
@@ -110,15 +114,15 @@ Create FastAPI service scaffold with proper project structure and mcp-vector-sea
    │   │   └── __init__.py
    │   ├── models/
    │   │   ├── __init__.py
-   │   │   └── session.py         # Stub from Phase 1.0
+   │   │   └── session.py            # Stub from Phase 1.0
    │   └── sandbox/
-   │       └── __init__.py        # From Phase 1.0
+   │       └── __init__.py           # From Phase 1.0
    ├── tests/
    │   └── __init__.py
-   ├── Dockerfile                  # Multi-stage build (NEW)
-   ├── pyproject.toml             # Updated with deps (NEW)
-   ├── .env.example               # Configuration template (NEW)
-   └── README.md                  # TBD Phase 1.8
+   ├── Dockerfile                     # Multi-stage build (NEW)
+   ├── pyproject.toml                # Updated with deps (NEW)
+   ├── .env.example                  # Configuration template (NEW)
+   └── README.md                     # TBD Phase 1.8
    ```
 
 ---
@@ -138,7 +142,7 @@ Create FastAPI service scaffold with proper project structure and mcp-vector-sea
 FastAPI application entry point for research-mind service.
 
 Manages:
-- VectorSearchManager singleton initialization
+- Workspace indexer CLI verification on startup
 - Middleware configuration
 - Error handling
 - Health checks
@@ -150,9 +154,9 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import time
+import subprocess
 
 from app.core.config import settings
-from app.core.vector_search import VectorSearchManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -174,48 +178,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global state
-_vector_search_manager: VectorSearchManager = None
-
 
 @app.on_event("startup")
 async def startup():
-    """Initialize VectorSearchManager singleton on service startup."""
-    global _vector_search_manager
-
-    logger.info("Initializing VectorSearchManager singleton...")
-    start_time = time.time()
+    """Verify mcp-vector-search CLI is available on service startup."""
+    logger.info("Verifying mcp-vector-search CLI availability...")
 
     try:
-        _vector_search_manager = VectorSearchManager()
-        duration = time.time() - start_time
-        logger.info(f"✓ VectorSearchManager initialized in {duration:.1f}s")
-    except Exception as e:
-        logger.error(f"✗ Failed to initialize VectorSearchManager: {e}")
-        raise
+        result = subprocess.run(
+            ["mcp-vector-search", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            logger.info(f"mcp-vector-search CLI available: {result.stdout.strip()}")
+        else:
+            logger.warning(
+                f"mcp-vector-search CLI returned non-zero: {result.stderr}"
+            )
+    except FileNotFoundError:
+        logger.error(
+            "mcp-vector-search CLI not found. "
+            "Install with: pip install mcp-vector-search"
+        )
+        raise RuntimeError("mcp-vector-search CLI not available")
+    except subprocess.TimeoutExpired:
+        logger.error("mcp-vector-search CLI version check timed out")
+        raise RuntimeError("mcp-vector-search CLI not responding")
 
 
 @app.on_event("shutdown")
 async def shutdown():
-    """Cleanup VectorSearchManager on service shutdown."""
-    global _vector_search_manager
-
-    if _vector_search_manager:
-        logger.info("Shutting down VectorSearchManager...")
-        try:
-            # Clean up resources (close connections, etc.)
-            _vector_search_manager.shutdown()
-            logger.info("✓ VectorSearchManager shutdown complete")
-        except Exception as e:
-            logger.error(f"✗ Error during shutdown: {e}")
-
-
-def get_vector_search_manager() -> VectorSearchManager:
-    """Get VectorSearchManager singleton instance."""
-    global _vector_search_manager
-    if _vector_search_manager is None:
-        raise RuntimeError("VectorSearchManager not initialized. Ensure startup completed.")
-    return _vector_search_manager
+    """Cleanup on service shutdown."""
+    logger.info("Service shutting down")
 
 
 # Health check endpoint
@@ -270,7 +266,7 @@ if __name__ == "__main__":
 2. **Test FastAPI startup**
    ```bash
    cd research-mind-service
-   python3 -c "from app.main import app; print('✓ FastAPI app imports successfully')"
+   python3 -c "from app.main import app; print('FastAPI app imports successfully')"
    ```
 
 **Success Criteria**:
@@ -280,199 +276,299 @@ if __name__ == "__main__":
 - [ ] Health check endpoint accessible (GET /api/health)
 - [ ] Error handling middleware working
 - [ ] Request logging working
-- [ ] Startup/shutdown hooks defined
+- [ ] Startup verifies mcp-vector-search CLI availability
 
 ---
 
-### Task 1.1.2: Implement VectorSearchManager Singleton (12-16 hours)
+### Task 1.1.2: Implement WorkspaceIndexer Subprocess Manager (12-16 hours)
 
-**Objective**: Create singleton that loads embedding model once and caches for all requests
+**Objective**: Create WorkspaceIndexer class that spawns mcp-vector-search subprocess for workspace init and indexing
 
 #### Critical Architecture Pattern
 
-From Phase 1.0 verification, we know:
+From subprocess integration research, we know:
 
-- First model load: 2-3 minutes (includes ~400MB download to cache)
-- Cached load: <1ms (in-memory reference)
-- Must load exactly ONCE per service startup
-- Must be thread-safe for concurrent requests
+- mcp-vector-search runs as a **CLI subprocess**, not an embedded library
+- Two-step flow: `mcp-vector-search init --force` then `mcp-vector-search index --force`
+- Working directory (`cwd`) determines which workspace is indexed
+- Exit codes: 0 = success, 1 = failure
+- Index artifacts stored in workspace `.mcp-vector-search/` directory
+
+#### Workspace Indexing Subprocess Pattern
+
+```
+research-mind-service (FastAPI)
+  ├── Workspace Management API
+  │   ├── POST /workspaces/{id}/register
+  │   └── POST /workspaces/{id}/index
+  │
+  └── WorkspaceIndexer (subprocess manager)
+      └── subprocess.run()
+          ├── mcp-vector-search init --force (cwd=workspace_dir, timeout=30s)
+          └── mcp-vector-search index --force (cwd=workspace_dir, timeout=60-600s)
+              └── Workspace Directory
+                  ├── source code files
+                  └── .mcp-vector-search/
+                      ├── config.json
+                      ├── .chromadb/
+                      └── embeddings cache
+```
 
 #### Steps
 
-1. **Create app/core/vector_search.py**
+1. **Create app/core/workspace_indexer.py**
 
 ```python
 """
-VectorSearchManager singleton for mcp-vector-search integration.
+WorkspaceIndexer subprocess manager for mcp-vector-search.
 
 Responsible for:
-- Loading embedding model exactly once per service startup
-- Managing ChromaDB instance (shared across sessions)
-- Providing session-scoped indexer wrappers
-- Resource cleanup on shutdown
+- Spawning mcp-vector-search CLI as subprocess
+- Two-step init + index flow per workspace
+- Exit code handling and error recovery
+- Timeout management for different project sizes
+- Index status checking via .mcp-vector-search/ directory existence
 
-Thread-safe singleton pattern ensures model loads exactly once.
+This class does NOT embed mcp-vector-search as a library.
+It invokes the CLI via subprocess.run() with cwd set to workspace directory.
 """
 
+import subprocess
 import logging
-from typing import Optional
+import time
 from pathlib import Path
-import threading
-
-from mcp_vector_search import Client
-from mcp_vector_search.indexing import SemanticIndexer
-from mcp_vector_search.search import SearchEngine
+from typing import Optional
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 
-class VectorSearchManager:
-    """
-    Singleton manager for mpc-vector-search library.
+@dataclass
+class IndexingResult:
+    """Result of a subprocess indexing operation."""
+    success: bool
+    elapsed_seconds: float
+    stdout: str
+    stderr: str
+    command: str
 
-    Loads embedding model on first access (lazy loading), then caches
-    for all subsequent requests. Thread-safe for concurrent access.
+    def __str__(self) -> str:
+        status = "SUCCESS" if self.success else "FAILED"
+        return f"{status}: {self.command} ({self.elapsed_seconds:.1f}s)"
+
+
+class WorkspaceIndexer:
+    """
+    Manages mcp-vector-search subprocess for workspace indexing.
+
+    Each workspace maintains its own independent index in
+    .mcp-vector-search/ directory. This class spawns CLI
+    subprocesses to initialize and index workspaces.
 
     Performance Characteristics:
-    - First initialization: ~30 seconds (downloads model if not cached)
-    - Subsequent initializations: <1ms (loads from cache)
-    - Memory usage: ~400MB (model) + ~100MB (ChromaDB)
+    - Init: ~2-5 seconds (includes model download on first run: ~250-500 MB)
+    - Index (small project): ~3-5 seconds
+    - Index (100 files): ~10-15 seconds
+    - Index (500 files): ~30-60 seconds
+    - Index (1000+ files): ~120-300 seconds
 
     Attributes:
-        client: mcp-vector-search Client instance
-        indexer: SemanticIndexer instance
-        search_engine: SearchEngine instance
+        workspace_dir: Path to workspace directory
     """
 
-    _instance: Optional['VectorSearchManager'] = None
-    _lock: threading.Lock = threading.Lock()
+    # Default timeouts (seconds)
+    INIT_TIMEOUT = 30
+    INDEX_TIMEOUT_SMALL = 60      # <100 files
+    INDEX_TIMEOUT_MEDIUM = 300    # 100-500 files
+    INDEX_TIMEOUT_LARGE = 600     # 500+ files
 
-    def __new__(cls):
-        """Ensure only one instance exists (thread-safe singleton)."""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._initialized = False
-        return cls._instance
-
-    def __init__(self):
-        """Initialize VectorSearchManager (lazy loading on first access)."""
-        if self._initialized:
-            return  # Already initialized, skip
-
-        logger.info("Initializing VectorSearchManager...")
-
-        try:
-            # Initialize mcp-vector-search client
-            # Model will be downloaded on first use (if not cached)
-            self.client = Client()
-
-            # Get indexer and search engine
-            self.indexer = SemanticIndexer(client=self.client)
-            self.search_engine = SearchEngine(client=self.client)
-
-            logger.info("✓ VectorSearchManager initialized successfully")
-            self._initialized = True
-
-        except Exception as e:
-            logger.error(f"✗ Failed to initialize VectorSearchManager: {e}")
-            raise
-
-    def shutdown(self):
-        """Cleanup resources on service shutdown."""
-        logger.info("Shutting down VectorSearchManager...")
-
-        try:
-            # Close any open connections
-            if hasattr(self.client, 'close'):
-                self.client.close()
-
-            logger.info("✓ VectorSearchManager shutdown complete")
-        except Exception as e:
-            logger.error(f"✗ Error during shutdown: {e}")
-
-    def get_session_indexer(self, session_id: str):
+    def __init__(self, workspace_dir: Path):
         """
-        Get a SessionIndexer for a specific session.
-
-        Creates a wrapper around SemanticIndexer that enforces
-        session scoping via collection naming: session_{session_id}
+        Initialize WorkspaceIndexer for a specific workspace.
 
         Args:
-            session_id: UUID of the session
+            workspace_dir: Path to workspace directory (must exist)
 
-        Returns:
-            SessionIndexer: Scoped indexer for the session
+        Raises:
+            ValueError: If workspace directory does not exist
         """
-        # Will be implemented in Phase 1.3
-        # Returns wrapper with session-scoped collection
-        from app.core.session_indexer import SessionIndexer
-        return SessionIndexer(session_id=session_id, manager=self)
+        self.workspace_dir = Path(workspace_dir).resolve()
+        if not self.workspace_dir.is_dir():
+            raise ValueError(f"Workspace directory not found: {self.workspace_dir}")
 
-    def get_session_search(self, session_id: str):
+    def initialize(self, timeout: int = INIT_TIMEOUT) -> IndexingResult:
         """
-        Get a search engine scoped to a session.
+        Initialize workspace for mcp-vector-search (one-time).
+
+        Creates .mcp-vector-search/ directory with config and index artifacts.
 
         Args:
-            session_id: UUID of the session
+            timeout: Max seconds to wait (default 30s)
 
         Returns:
-            Callable: Search function scoped to session collection
+            IndexingResult with success/failure and output
         """
-        # Will be implemented in Phase 1.3
-        # Returns search wrapper with session-scoped collection
-        collection_name = f"session_{session_id}"
+        return self._run_command(
+            ["mcp-vector-search", "init", "--force"],
+            timeout=timeout,
+        )
 
-        async def search(query: str, top_k: int = 10):
-            """Search within session collection."""
-            return await self.search_engine.search(
-                query=query,
-                collection_name=collection_name,
-                top_k=top_k,
+    def index(self, timeout: int = INDEX_TIMEOUT_SMALL, force: bool = True) -> IndexingResult:
+        """
+        Index workspace source code.
+
+        Args:
+            timeout: Max seconds to wait (default 60s, increase for large projects)
+            force: Force full reindex (default True)
+
+        Returns:
+            IndexingResult with success/failure and output
+        """
+        cmd = ["mcp-vector-search", "index"]
+        if force:
+            cmd.append("--force")
+        return self._run_command(cmd, timeout=timeout)
+
+    def initialize_and_index(self, index_timeout: int = INDEX_TIMEOUT_SMALL) -> IndexingResult:
+        """
+        Full init + index flow for a workspace.
+
+        Args:
+            index_timeout: Timeout for the index step
+
+        Returns:
+            IndexingResult from the index step (or init step if it failed)
+        """
+        init_result = self.initialize()
+        if not init_result.success:
+            logger.error(f"Init failed for {self.workspace_dir}: {init_result.stderr}")
+            return init_result
+
+        return self.index(timeout=index_timeout)
+
+    def check_health(self, timeout: int = 10) -> IndexingResult:
+        """Check index health status."""
+        return self._run_command(
+            ["mcp-vector-search", "index", "health"],
+            timeout=timeout,
+        )
+
+    def is_indexed(self) -> bool:
+        """
+        Check if workspace has been indexed.
+
+        Checks for existence of .mcp-vector-search/ directory
+        in the workspace, which is created by the init command.
+
+        Returns:
+            True if .mcp-vector-search/ directory exists
+        """
+        index_dir = self.workspace_dir / ".mcp-vector-search"
+        return index_dir.is_dir()
+
+    def _run_command(self, cmd: list[str], timeout: int) -> IndexingResult:
+        """
+        Run mcp-vector-search CLI subprocess.
+
+        Args:
+            cmd: Command and arguments
+            timeout: Max seconds to wait
+
+        Returns:
+            IndexingResult with success/failure and captured output
+        """
+        cmd_str = " ".join(cmd)
+        logger.info(f"Running: {cmd_str} (cwd={self.workspace_dir}, timeout={timeout}s)")
+
+        start_time = time.time()
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=str(self.workspace_dir),
+                timeout=timeout,
+                capture_output=True,
+                text=True,
+                check=False,  # Don't raise on non-zero exit
+            )
+            elapsed = time.time() - start_time
+
+            indexing_result = IndexingResult(
+                success=result.returncode == 0,
+                elapsed_seconds=elapsed,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                command=cmd_str,
             )
 
-        return search
+            if indexing_result.success:
+                logger.info(f"Completed: {cmd_str} ({elapsed:.1f}s)")
+            else:
+                logger.error(
+                    f"Failed: {cmd_str} (exit code {result.returncode}): {result.stderr}"
+                )
+
+            return indexing_result
+
+        except subprocess.TimeoutExpired:
+            elapsed = time.time() - start_time
+            logger.error(f"Timeout: {cmd_str} after {timeout}s")
+            return IndexingResult(
+                success=False,
+                elapsed_seconds=elapsed,
+                stdout="",
+                stderr=f"Timeout after {timeout}s",
+                command=cmd_str,
+            )
+
+        except FileNotFoundError:
+            elapsed = time.time() - start_time
+            logger.error("mcp-vector-search CLI not found in PATH")
+            return IndexingResult(
+                success=False,
+                elapsed_seconds=elapsed,
+                stdout="",
+                stderr="mcp-vector-search CLI not found. Install with: pip install mcp-vector-search",
+                command=cmd_str,
+            )
 ```
 
-2. **Test Singleton Pattern**
+2. **Test WorkspaceIndexer**
 
    ```bash
    python3 << 'EOF'
-   import time
-   from app.core.vector_search import VectorSearchManager
+   import tempfile
+   from pathlib import Path
+   from app.core.workspace_indexer import WorkspaceIndexer
 
-   # First instantiation (loads model)
-   print("First instantiation...")
-   start = time.time()
-   manager1 = VectorSearchManager()
-   duration1 = time.time() - start
-   print(f"Duration: {duration1:.1f}s")
+   # Create a temp workspace
+   with tempfile.TemporaryDirectory() as tmpdir:
+       workspace = Path(tmpdir)
+       # Create a test file
+       (workspace / "test.py").write_text("def hello(): return 'world'")
 
-   # Second instantiation (should be immediate)
-   print("Second instantiation...")
-   start = time.time()
-   manager2 = VectorSearchManager()
-   duration2 = time.time() - start
-   print(f"Duration: {duration2:.3f}s")
+       indexer = WorkspaceIndexer(workspace)
 
-   # Verify singleton
-   assert manager1 is manager2, "Singleton pattern failed!"
-   print("✓ Singleton pattern verified")
+       # Test init
+       result = indexer.initialize()
+       print(f"Init: {result}")
 
-   # Cleanup
-   manager1.shutdown()
+       # Test index
+       result = indexer.index()
+       print(f"Index: {result}")
+
+       # Test is_indexed
+       print(f"Is indexed: {indexer.is_indexed()}")
    EOF
    ```
 
 **Success Criteria**:
 
-- [ ] VectorSearchManager singleton pattern implemented
-- [ ] Thread-safe initialization (double-checked locking)
-- [ ] Model loads on first instantiation (30s expected)
-- [ ] Model cached on second instantiation (<1s)
-- [ ] Same instance returned (singleton verified)
-- [ ] Shutdown method cleans up resources
+- [ ] WorkspaceIndexer class implemented with subprocess.run()
+- [ ] Two-step init + index flow working
+- [ ] Exit code handling (0 = success, 1 = failure)
+- [ ] Timeout management configurable (30s init, 60-600s index)
+- [ ] is_indexed() checks .mcp-vector-search/ directory existence
+- [ ] Proper error handling for timeout, missing CLI, and failures
 
 ---
 
@@ -512,21 +608,17 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./research_mind.db"
     database_echo: bool = False
 
-    # mcp-vector-search Configuration
-    # Model will be cached at these locations
-    hf_cache_dir: str = os.path.expanduser("~/.cache/huggingface/")
-    embeddings_model: str = "all-MiniLM-L6-v2"
-    embeddings_device: str = "cpu"  # "cpu" or "cuda"
+    # Workspace Configuration
+    workspace_root: str = "/var/lib/research-mind/workspaces/"
+
+    # Subprocess Timeout Configuration (seconds)
+    indexing_init_timeout: int = 30        # mcp-vector-search init
+    indexing_index_timeout: int = 60       # mcp-vector-search index (small projects)
+    indexing_large_timeout: int = 600      # mcp-vector-search index (large projects)
 
     # Session Configuration
-    session_workspace_root: str = "/var/lib/research-mind/sessions/"
     session_max_duration_minutes: int = 60
     session_idle_timeout_minutes: int = 30
-
-    # Vector Search Configuration
-    chromadb_persist_dir: str = "/var/lib/research-mind/chromadb/"
-    search_result_limit: int = 10
-    search_timeout_seconds: int = 30
 
     # CORS Configuration
     cors_origins: List[str] = ["http://localhost:15000", "http://localhost:3000"]
@@ -536,7 +628,7 @@ class Settings(BaseSettings):
     audit_logging_enabled: bool = True
 
     # Feature Flags
-    enable_agent_integration: bool = True
+    enable_agent_integration: bool = False  # Deferred to Phase 2
     enable_caching: bool = False  # Phase 2
     enable_warm_pools: bool = False  # Phase 2
 
@@ -560,15 +652,15 @@ def validate_settings():
     logger.info(f"  Host: {settings.host}:{settings.port}")
     logger.info(f"  Database: {settings.database_url}")
     logger.info(f"  Debug: {settings.debug}")
-    logger.info(f"  Workspace Root: {settings.session_workspace_root}")
-    logger.info(f"  Model: {settings.embeddings_model}")
+    logger.info(f"  Workspace Root: {settings.workspace_root}")
+    logger.info(f"  Init Timeout: {settings.indexing_init_timeout}s")
+    logger.info(f"  Index Timeout: {settings.indexing_index_timeout}s")
 
     # Create required directories
     from pathlib import Path
 
     for directory in [
-        settings.session_workspace_root,
-        settings.chromadb_persist_dir,
+        settings.workspace_root,
     ]:
         Path(directory).mkdir(parents=True, exist_ok=True)
         logger.info(f"  Created/verified directory: {directory}")
@@ -589,20 +681,17 @@ DATABASE_URL=postgresql://postgres:password@localhost:5432/research_mind  # prag
 # DATABASE_URL=sqlite:///./research_mind.db
 DATABASE_ECHO=False
 
-# mcp-vector-search Configuration
-HF_CACHE_DIR=~/.cache/huggingface/
-EMBEDDINGS_MODEL=all-MiniLM-L6-v2
-EMBEDDINGS_DEVICE=cpu  # "cpu" or "cuda"
+# Workspace Configuration
+WORKSPACE_ROOT=/var/lib/research-mind/workspaces/
+
+# Subprocess Timeout Configuration (seconds)
+INDEXING_INIT_TIMEOUT=30
+INDEXING_INDEX_TIMEOUT=60
+INDEXING_LARGE_TIMEOUT=600
 
 # Session Configuration
-SESSION_WORKSPACE_ROOT=/var/lib/research-mind/sessions/
 SESSION_MAX_DURATION_MINUTES=60
 SESSION_IDLE_TIMEOUT_MINUTES=30
-
-# Vector Search Configuration
-CHROMADB_PERSIST_DIR=/var/lib/research-mind/chromadb/
-SEARCH_RESULT_LIMIT=10
-SEARCH_TIMEOUT_SECONDS=30
 
 # CORS Configuration
 CORS_ORIGINS=http://localhost:15000,http://localhost:3000
@@ -612,14 +701,14 @@ PATH_VALIDATOR_ENABLED=True
 AUDIT_LOGGING_ENABLED=True
 
 # Feature Flags
-ENABLE_AGENT_INTEGRATION=True
+ENABLE_AGENT_INTEGRATION=False
 ENABLE_CACHING=False
 ENABLE_WARM_POOLS=False
 ```
 
 3. **Test Configuration**
    ```bash
-   python3 -c "from app.core.config import settings, validate_settings; validate_settings(); print('✓ Configuration loaded')"
+   python3 -c "from app.core.config import settings, validate_settings; validate_settings(); print('Configuration loaded')"
    ```
 
 **Success Criteria**:
@@ -635,7 +724,7 @@ ENABLE_WARM_POOLS=False
 
 ### Task 1.1.4: Create Dockerfile (4-6 hours)
 
-**Objective**: Multi-stage Docker build including mpc-vector-search dependencies
+**Objective**: Multi-stage Docker build including mcp-vector-search CLI
 
 #### Steps
 
@@ -663,29 +752,22 @@ FROM python:3.12-slim as runtime
 
 WORKDIR /app
 
-# Install runtime-only dependencies
-RUN apt-get update && apt-get install -y \
-    libgomp1 \  # For PyTorch multithreading
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy Python dependencies from builder
 COPY --from=builder /root/.local /root/.local
 
-# Set PATH to use local Python packages
+# Set PATH to use local Python packages (includes mcp-vector-search CLI)
 ENV PATH=/root/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    TRANSFORMERS_CACHE=/cache/huggingface/transformers \
-    HF_HOME=/cache/huggingface \
-    HF_HUB_CACHE=/cache/huggingface/hub
+    PYTHONDONTWRITEBYTECODE=1
 
 # Copy application code
 COPY . .
 
 # Create required directories
-RUN mkdir -p /var/lib/research-mind/sessions \
-    && mkdir -p /var/lib/research-mind/chromadb \
-    && mkdir -p /cache/huggingface
+RUN mkdir -p /var/lib/research-mind/workspaces
+
+# Verify mcp-vector-search CLI is available
+RUN mcp-vector-search --version || echo "WARNING: mcp-vector-search CLI not found"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
@@ -725,16 +807,16 @@ node_modules
    ```bash
    cd research-mind-service
    docker build -t research-mind-service:test .
-   docker run --rm research-mind-service:test python3 -c "from app.main import app; print('✓ Docker build successful')"
+   docker run --rm research-mind-service:test mcp-vector-search --version
    ```
 
 **Success Criteria**:
 
 - [ ] Dockerfile created with multi-stage build
-- [ ] All dependencies included
+- [ ] mcp-vector-search CLI available inside container
 - [ ] Health check configured
 - [ ] Docker image builds without errors
-- [ ] Image size reasonable (<2GB)
+- [ ] Image size reasonable (<1GB)
 - [ ] .dockerignore prevents unnecessary files
 
 ---
@@ -771,7 +853,7 @@ dependencies = [
     "alembic>=1.12.0",
     "psycopg2-binary>=2.9.0",  # PostgreSQL driver
 
-    # mcp-vector-search (CRITICAL for Phase 1.1)
+    # mcp-vector-search (provides CLI command)
     "mcp-vector-search>=0.1.0",
 
     # Additional utilities
@@ -817,7 +899,7 @@ disallow_untyped_defs = false
 **Success Criteria**:
 
 - [ ] pyproject.toml created/updated
-- [ ] mcp-vector-search dependency added
+- [ ] mcp-vector-search dependency added (provides CLI)
 - [ ] All required dependencies specified
 - [ ] Dev dependencies included (pytest, mypy, black)
 - [ ] uv sync or pip install completes successfully
@@ -838,10 +920,13 @@ Unit tests for Phase 1.1 service architecture.
 """
 
 import pytest
+import tempfile
+from pathlib import Path
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.config import settings
-from app.core.vector_search import VectorSearchManager
+from app.core.workspace_indexer import WorkspaceIndexer, IndexingResult
 
 
 @pytest.fixture
@@ -859,11 +944,76 @@ def test_health_check(client):
     assert data["service"] == "research-mind"
 
 
-def test_vector_search_manager_singleton():
-    """Test VectorSearchManager singleton pattern."""
-    manager1 = VectorSearchManager()
-    manager2 = VectorSearchManager()
-    assert manager1 is manager2, "Singleton pattern failed"
+def test_workspace_indexer_init():
+    """Test WorkspaceIndexer initialization."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        indexer = WorkspaceIndexer(Path(tmpdir))
+        assert indexer.workspace_dir == Path(tmpdir).resolve()
+
+
+def test_workspace_indexer_invalid_dir():
+    """Test WorkspaceIndexer rejects invalid directory."""
+    with pytest.raises(ValueError, match="not found"):
+        WorkspaceIndexer(Path("/nonexistent/path"))
+
+
+def test_workspace_indexer_is_indexed():
+    """Test is_indexed checks .mcp-vector-search/ directory."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        workspace = Path(tmpdir)
+        indexer = WorkspaceIndexer(workspace)
+
+        # Not indexed initially
+        assert indexer.is_indexed() is False
+
+        # Create .mcp-vector-search/ directory
+        (workspace / ".mcp-vector-search").mkdir()
+        assert indexer.is_indexed() is True
+
+
+@patch("subprocess.run")
+def test_workspace_indexer_subprocess_invocation(mock_run):
+    """Test subprocess is called correctly."""
+    mock_run.return_value = MagicMock(returncode=0, stdout="OK", stderr="")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        indexer = WorkspaceIndexer(Path(tmpdir))
+        result = indexer.initialize()
+
+        assert result.success is True
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args
+        assert call_args[0][0] == ["mcp-vector-search", "init", "--force"]
+        assert call_args[1]["cwd"] == str(Path(tmpdir).resolve())
+
+
+@patch("subprocess.run")
+def test_workspace_indexer_timeout_handling(mock_run):
+    """Test timeout is handled gracefully."""
+    import subprocess
+    mock_run.side_effect = subprocess.TimeoutExpired(cmd="test", timeout=30)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        indexer = WorkspaceIndexer(Path(tmpdir))
+        result = indexer.initialize()
+
+        assert result.success is False
+        assert "Timeout" in result.stderr
+
+
+@patch("subprocess.run")
+def test_workspace_indexer_exit_code_handling(mock_run):
+    """Test non-zero exit code is handled."""
+    mock_run.return_value = MagicMock(
+        returncode=1, stdout="", stderr="Permission denied"
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        indexer = WorkspaceIndexer(Path(tmpdir))
+        result = indexer.initialize()
+
+        assert result.success is False
+        assert "Permission denied" in result.stderr
 
 
 def test_configuration_loaded():
@@ -871,16 +1021,8 @@ def test_configuration_loaded():
     assert settings.host == "0.0.0.0"
     assert settings.port == 15010
     assert settings.database_url is not None
-    assert settings.embeddings_model == "all-MiniLM-L6-v2"
-
-
-def test_vector_search_manager_has_required_attributes():
-    """Test VectorSearchManager has required attributes."""
-    manager = VectorSearchManager()
-    assert hasattr(manager, 'client')
-    assert hasattr(manager, 'indexer')
-    assert hasattr(manager, 'search_engine')
-    assert callable(getattr(manager, 'shutdown'))
+    assert settings.indexing_init_timeout == 30
+    assert settings.indexing_index_timeout == 60
 ```
 
 2. **Run tests**
@@ -905,10 +1047,11 @@ def test_vector_search_manager_has_required_attributes():
 **Success Criteria**:
 
 - [ ] Health check endpoint returns 200
-- [ ] Singleton pattern verified
+- [ ] WorkspaceIndexer subprocess invocation verified
+- [ ] Exit code handling tested (success + failure)
+- [ ] Timeout handling tested
 - [ ] Configuration loads without errors
 - [ ] Service starts on port 15010
-- [ ] VectorSearchManager initializes
 - [ ] All tests pass
 - [ ] No import errors
 - [ ] Docker image builds and runs
@@ -919,40 +1062,24 @@ def test_vector_search_manager_has_required_attributes():
 
 ### Primary References
 
-**docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md** (Sections 4, 5, 10)
+**docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md** (v2.0 - Subprocess-Based)
 
-- **Section 4: Architecture Design: SessionIndexer Wrapper**
+- **Architecture Overview**: Subprocess-based design pattern
+- **CLI Command Reference**: init, index, reindex commands
+- **Subprocess Invocation Pattern**: subprocess.run() with cwd
+- **Python Integration Examples**: WorkspaceIndexer class template
+- **Error Handling & Recovery**: Exit codes, timeouts, common errors
+- **Performance & Optimization**: Timing baselines and scaling estimates
 
-  - VectorSearchManager singleton pattern (exact template used here)
-  - Model caching strategy proven in Phase 1.0
-  - Code example for lazy-loading singleton
-  - Integration with FastAPI startup/shutdown hooks
+**docs/research2/RESEARCH_SUMMARY.md**
 
-- **Section 5: Environment Setup & Configuration**
-
-  - HuggingFace cache directory configuration
-  - Model caching via environment variables
-  - Performance baseline expectations
-
-- **Section 10: Reference Implementation Patterns**
-  - Complete code templates for VectorSearchManager
-  - Proper resource cleanup on shutdown
-
-**docs/research/mcp-vector-search-rest-api-proposal.md** (Section 1)
-
-- Service architecture overview
-- REST API framework requirements
-- Session scoping architecture
-
-**docs/research/combined-architecture-recommendations.md** (Section 4)
-
-- Phase 1 implementation strategy
-- Singleton pattern recommendation
+- Quick reference of verified subprocess behavior
+- Test results for subprocess invocation, isolation, exit codes
 
 ### Secondary References
 
-- **IMPLEMENTATION_PLAN.md** - Phase 1.1 section (lines 167-214)
-- **docs/research/mcp-vector-search-capabilities.md** - Library internals context
+- **IMPLEMENTATION_PLAN.md** - Phase 1.1 section
+- **docs/research2/mcp-vector-search-subprocess-integration-research.md** - Complete research findings
 
 ---
 
@@ -964,27 +1091,28 @@ All criteria must be met before Phase 1.2 can start:
 
 - [ ] FastAPI service running on port 15010
 - [ ] GET /api/health returns 200 with correct JSON response
-- [ ] VectorSearchManager singleton initializes on startup
-- [ ] Embedding model loads successfully
+- [ ] mcp-vector-search CLI verified available on startup
+- [ ] WorkspaceIndexer spawns subprocess correctly
 - [ ] Service starts and shuts down cleanly
 - [ ] No import errors or dependency issues
 
 ### Architecture (MUST COMPLETE)
 
-- [ ] Singleton pattern implemented correctly
-- [ ] Lazy loading of embedding model
-- [ ] Thread-safe initialization
-- [ ] Proper resource cleanup on shutdown
+- [ ] Subprocess-based indexing pattern implemented
+- [ ] Two-step init + index flow working
+- [ ] Exit code handling (0=success, 1=failure)
+- [ ] Timeout management (configurable per operation)
+- [ ] Index status checking via .mcp-vector-search/ directory
 - [ ] Configuration system working
 
 ### Testing (MUST COMPLETE)
 
 - [ ] Unit tests created and passing
 - [ ] Health check test passing
-- [ ] Singleton test passing
+- [ ] WorkspaceIndexer subprocess tests passing (mocked)
 - [ ] Configuration test passing
 - [ ] Docker image builds successfully
-- [ ] Service starts in Docker
+- [ ] Service starts in Docker with mcp-vector-search CLI available
 
 ### Documentation (MUST COMPLETE)
 
@@ -998,7 +1126,7 @@ All criteria must be met before Phase 1.2 can start:
 - [ ] Code follows PEP 8 style guide
 - [ ] Type hints added where applicable
 - [ ] Error handling proper (no bare except)
-- [ ] Logging implemented for startup/shutdown
+- [ ] Logging implemented for subprocess operations
 - [ ] No security issues identified
 
 ---
@@ -1008,7 +1136,7 @@ All criteria must be met before Phase 1.2 can start:
 **GO to Phase 1.2** if:
 
 - [ ] Health check test passes
-- [ ] VectorSearchManager singleton works correctly
+- [ ] WorkspaceIndexer subprocess invocation works correctly
 - [ ] Docker image builds without errors
 - [ ] Service starts and responds to requests
 - [ ] Configuration system validated
@@ -1016,16 +1144,16 @@ All criteria must be met before Phase 1.2 can start:
 
 **NO-GO if**:
 
-- [ ] Import errors or dependency conflicts
-- [ ] VectorSearchManager fails to initialize
+- [ ] mcp-vector-search CLI not found or not working
+- [ ] Subprocess invocation fails
 - [ ] Health check not working
 - [ ] Docker build fails
-- [ ] Singleton pattern not thread-safe
+- [ ] Exit code handling not reliable
 
 **Resolution for NO-GO**:
 
-1. Debug dependency issues (likely mpc-vector-search compatibility)
-2. Fix VectorSearchManager implementation
+1. Verify mcp-vector-search installation (pip install mcp-vector-search)
+2. Debug subprocess invocation (check PATH, permissions)
 3. Resolve Docker build issues
 4. Re-run acceptance criteria
 
@@ -1033,76 +1161,79 @@ All criteria must be met before Phase 1.2 can start:
 
 ## Risks
 
-### Risk 1: mcp-vector-search Integration Issues
+### Risk 1: mcp-vector-search CLI Not Available
 
-**Description**: VectorSearchManager fails to integrate with mcp-vector-search library
+**Description**: mcp-vector-search CLI command not found in service environment
 
-**Probability**: Low-Medium (library was validated in Phase 1.0)
+**Probability**: Low-Medium (CLI was validated in Phase 1.0)
 
-**Impact**: HIGH - Blocks all downstream phases
+**Impact**: HIGH - Blocks all indexing operations
 
 **Mitigation**:
 
-- Phase 1.0 pre-validated library integration
-- Use exact code templates from MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md
-- Reference implementation patterns from research docs
+- Phase 1.0 pre-validated CLI installation
+- Startup check verifies CLI availability
+- Dockerfile includes explicit verification step
 
-**Detection**: Task 1.1.2 test failures
+**Detection**: Service startup failure, CLI version check fails
 
-**Fallback**: Revert to CLI-based integration (less ideal but possible)
+**Fallback**: Reinstall mcp-vector-search, verify PATH configuration
 
 ---
 
-### Risk 2: Model Loading Timeout
+### Risk 2: Subprocess Timeout on Large Workspaces
 
-**Description**: Embedding model download/loading takes longer than expected
+**Description**: Indexing large codebases exceeds default timeout
 
-**Probability**: Low (verified in Phase 1.0)
+**Probability**: Medium (large projects may have 1000+ files)
 
-**Impact**: MEDIUM - Startup latency issue
+**Impact**: MEDIUM - Indexing fails for large projects
 
 **Mitigation**:
 
-- Baseline established in Phase 1.0 (2-3 min expected)
-- Document startup expectations clearly
-- Consider longer startup timeout in CI/CD
+- Configurable timeouts (60s, 300s, 600s tiers)
+- Research baseline: 3.89s for 2-file project, estimated 120-300s for 1000+ files
+- Large project timeout set to 600s by default
+- Background indexing option for very large projects
 
-**Detection**: Service startup takes >5 minutes
+**Detection**: TimeoutExpired exceptions in logs
 
-**Fallback**: Use smaller model, or pre-cache model in Docker image
+**Fallback**: Increase timeout, use --batch-size for throughput, break into smaller indexing jobs
 
 ---
 
-### Risk 3: Memory Issues with Large Model
+### Risk 3: Concurrent Subprocess Safety
 
-**Description**: 400MB+ model consumes too much memory
+**Description**: Multiple index operations on same workspace simultaneously
 
-**Probability**: Low (standard model for embedding)
+**Probability**: Low (API should serialize per workspace)
 
-**Impact**: MEDIUM - Can't run on resource-constrained systems
+**Impact**: MEDIUM - ChromaDB corruption possible
 
 **Mitigation**:
 
-- Use standard all-MiniLM-L6-v2 model (well-tested)
-- Monitor memory usage
-- Support CPU-only mode (default)
+- Single-writer safety: never index same workspace from multiple processes
+- API-level serialization per workspace
+- ChromaDB has internal locking for single-writer safety
+- Different workspaces can index in parallel safely
 
-**Detection**: Memory usage >1GB after initialization
+**Detection**: ChromaDB corruption errors, index health check failures
 
-**Fallback**: Use even smaller model (DistilBERT)
+**Fallback**: Delete .mcp-vector-search/ directory and re-initialize
 
 ---
 
 ## Success Metrics
 
-| Metric                 | Target                     | Measurement                            |
-| ---------------------- | -------------------------- | -------------------------------------- |
-| **Service Start Time** | <2 min                     | Time from docker-compose up to healthy |
-| **Health Check**       | 100ms                      | Response time for /api/health          |
-| **Singleton Pattern**  | Thread-safe                | Concurrent access test                 |
-| **Model Load**         | 30s (first), <1ms (cached) | Timing measurements                    |
-| **Test Coverage**      | >90%                       | pytest --cov report                    |
-| **Error Handling**     | 0 crashes                  | Service resilience                     |
+| Metric                 | Target               | Measurement                            |
+| ---------------------- | -------------------- | -------------------------------------- |
+| **Service Start Time** | <30s                 | Time from docker-compose up to healthy |
+| **Health Check**       | <100ms               | Response time for /api/health          |
+| **CLI Verification**   | <10s on startup      | mcp-vector-search --version check      |
+| **Subprocess Init**    | <30s                 | mcp-vector-search init runtime         |
+| **Subprocess Index**   | <60s (small project) | mcp-vector-search index runtime        |
+| **Test Coverage**      | >90%                 | pytest --cov report                    |
+| **Error Handling**     | 0 crashes            | Service resilience                     |
 
 ---
 
@@ -1111,16 +1242,17 @@ All criteria must be met before Phase 1.2 can start:
 **Phase 1.1** establishes the foundation for all subsequent Phase 1 work by:
 
 1. Creating FastAPI service scaffold with proper structure
-2. Implementing VectorSearchManager singleton for efficient model management
-3. Setting up configuration system (environment variables)
-4. Integrating with mpc-vector-search library
+2. Implementing WorkspaceIndexer subprocess manager for mcp-vector-search CLI
+3. Setting up configuration system (environment variables, timeouts)
+4. Verifying mcp-vector-search CLI availability on startup
 5. Verifying everything works in Docker
 
 **Upon completion**, all subsequent phases (1.2-1.8) can begin in parallel knowing the service foundation is solid.
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2026-01-31
-**Next Phase**: Phase 1.2 (Session Management), 1.3 (Vector Search API), 1.4 (Path Validator)
+**Document Version**: 2.0
+**Last Updated**: 2026-02-01
+**Architecture**: Subprocess-based (replaces v1.0 library embedding approach)
+**Next Phase**: Phase 1.2 (Session Management), 1.3 (Indexing Operations), 1.4 (Path Validator)
 **Parent**: 01-PHASE_1_FOUNDATION.md
