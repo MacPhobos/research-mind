@@ -28,6 +28,7 @@
 **Estimated Cost Savings**: 60-70% vs. baseline through caching + warm pools
 
 **CRITICAL UPDATE - Timeline Revised**:
+
 - **Original Phase 1 estimate**: 10-12 days (OPTIMISTIC)
 - **Revised Phase 1.0 (Pre-Phase)**: 2-3 days (mcp-vector-search setup + verification)
 - **Revised Phase 1.1-1.8**: 12-16 days (realistic with dependencies)
@@ -63,27 +64,32 @@ Build minimal end-to-end flow: create session → index content → search → a
 ### Tasks (2-3 Days Total)
 
 **1.0.1: Environment Prerequisites** (30 min)
+
 - Verify Python 3.12+ installed
 - Create/verify virtual environment
 - Check 3GB+ disk space available
 
 **1.0.2: Install mcp-vector-search** (2-4 hours) - CRITICAL BLOCKER
+
 - Add mcp-vector-search to pyproject.toml with pinned version
 - Run `uv sync` to install ~2.5GB of dependencies
 - Verify imports: `from mcp_vector_search import Client`
 - Verify transitive deps: transformers, torch, chromadb, sentence_transformers
 
 **1.0.3: Verify PostgreSQL** (1-2 hours)
+
 - Start PostgreSQL service
 - Test database connection
 - Run Alembic migrations (`alembic upgrade head`)
 - Verify tables exist (sessions, audit_logs)
 
 **1.0.4: Create Sandbox Directory** (1 hour)
+
 - Create `research-mind-service/app/sandbox/` directory
 - Create `__init__.py` for Python module
 
 **1.0.5: Test Model Caching** (1-2 hours) - Proof of Concept
+
 - Set HuggingFace cache environment variables
 - Download embedding model (all-MiniLM-L6-v2, ~400MB)
 - First run: 2-3 minutes (one-time)
@@ -91,13 +97,16 @@ Build minimal end-to-end flow: create session → index content → search → a
 - Document performance baseline
 
 **1.0.6: Session Model Stub** (1-2 hours)
+
 - Create `app/models/session.py` stub (will be completed in Phase 1.2)
 
 **1.0.7: Verify Docker** (1 hour)
+
 - Check Docker and docker-compose installed
 - Validate `docker-compose.yml` configuration
 
 **1.0.8: Document Baseline** (2-4 hours)
+
 - Create `.env.example` template
 - Create `docs/PHASE_1_0_BASELINE.md` documenting:
   - System environment (Python version, OS, disk space)
@@ -109,16 +118,19 @@ Build minimal end-to-end flow: create session → index content → search → a
 ### Critical Integration Patterns Established in Phase 1.0
 
 **Pattern 1: Singleton ChromaDB Manager**
+
 - Load model ONCE per service startup (~30s first run)
 - Reuse in-memory for all requests (<1ms subsequent)
 - Foundation for Phase 1.1 implementation
 
 **Pattern 2: Session-Scoped Collections**
+
 - Each session gets isolated ChromaDB collection: `session_{session_id}`
 - Shared ChromaDB instance, isolated collections
 - Verified in Phase 1.0 concurrent access testing
 
 **Pattern 3: Model Caching**
+
 - HuggingFace cache via environment variables
 - TRANSFORMERS_CACHE, HF_HOME, HF_HUB_CACHE
 - Avoids re-downloading 400MB model on subsequent runs
@@ -155,6 +167,7 @@ Build minimal end-to-end flow: create session → index content → search → a
 ### 1.1: Service Architecture Setup (5-6 days) - REVISED UP FROM 3-4
 
 **Note**: Phase 1.0 pre-phase has already:
+
 - ✅ Installed mcp-vector-search library (~2.5GB)
 - ✅ Verified all dependencies
 - ✅ Created pyproject.toml with mcp-vector-search
@@ -250,6 +263,7 @@ Build minimal end-to-end flow: create session → index content → search → a
 **Deliverable**: REST interface to mcp-vector-search with per-session indexing and search
 
 **Note**: Phase 1.0 has already proven:
+
 - ✅ mcp-vector-search library is installable and working
 - ✅ ChromaDB concurrent write safety (tested with multiple collections)
 - ✅ Model caching via environment variables works
@@ -453,6 +467,7 @@ class SessionIndexer:
 **Deliverable**: Comprehensive test suite validating MVP functionality with security focus
 
 **Note**: Security testing is more involved than initially estimated. Includes:
+
 - Path traversal fuzzing
 - Concurrent access verification
 - Cross-session contamination prevention
@@ -480,6 +495,7 @@ class SessionIndexer:
    - ChromaDB concurrent write safety verification (from Phase 1.0 testing)
 
 3. Security tests (CRITICAL):
+
    - Path traversal attempts: `../../../etc/passwd`, symlinks, etc. (fuzzing)
    - Hidden file access blocked (dotfiles, .env, etc.)
    - Session validation on every request
@@ -860,15 +876,15 @@ The following are the **top priority files** to implement first:
 
 ## Timeline & Effort Estimates
 
-| Phase             | Weeks    | Components                                             | Effort      | Team          | Notes                                            |
-| ----------------- | -------- | ------------------------------------------------------ | ----------- | ------------- | ------------------------------------------------ |
-| **Phase 1.0** | Pre-1 | Environment setup, mcp-vector-search install, verification | 2-3 days   | 1 FTE         | **CRITICAL** - Must complete before Phase 1.1   |
-| **MVP (Phase 1)** | 1-3      | Service arch, sessions, indexing, search, agent, tests | 12-16 days  | 2 FTE         | **CRITICAL PATH** - Blocks all subsequent phases |
-| **Total to MVP** | - | Phase 1.0 + Phase 1 combined | **15-21 days** | 2 FTE | More realistic than original 10-12 day estimate |
-| **Phase 2**       | 4-6      | Incremental indexing, caching, filtering, warm pools   | 3 weeks     | 1.5 FTE       | Parallel with initial user feedback              |
-| **Phase 3**       | 7-9      | Reranking, dedup, UX polish                            | 3 weeks     | 1 FTE         | Quality improvements                             |
-| **Phase 4**       | 10-12    | K8s, multi-instance, hardening                         | 3 weeks     | 2 FTE         | Production hardening                             |
-| **Total to Prod** | 12 weeks | Production-ready system                                | 12 weeks    | 2-2.5 FTE avg | Phase 1.0 impact: +5-9 days, net benefit risk reduction |
+| Phase             | Weeks    | Components                                                 | Effort         | Team          | Notes                                                   |
+| ----------------- | -------- | ---------------------------------------------------------- | -------------- | ------------- | ------------------------------------------------------- |
+| **Phase 1.0**     | Pre-1    | Environment setup, mcp-vector-search install, verification | 2-3 days       | 1 FTE         | **CRITICAL** - Must complete before Phase 1.1           |
+| **MVP (Phase 1)** | 1-3      | Service arch, sessions, indexing, search, agent, tests     | 12-16 days     | 2 FTE         | **CRITICAL PATH** - Blocks all subsequent phases        |
+| **Total to MVP**  | -        | Phase 1.0 + Phase 1 combined                               | **15-21 days** | 2 FTE         | More realistic than original 10-12 day estimate         |
+| **Phase 2**       | 4-6      | Incremental indexing, caching, filtering, warm pools       | 3 weeks        | 1.5 FTE       | Parallel with initial user feedback                     |
+| **Phase 3**       | 7-9      | Reranking, dedup, UX polish                                | 3 weeks        | 1 FTE         | Quality improvements                                    |
+| **Phase 4**       | 10-12    | K8s, multi-instance, hardening                             | 3 weeks        | 2 FTE         | Production hardening                                    |
+| **Total to Prod** | 12 weeks | Production-ready system                                    | 12 weeks       | 2-2.5 FTE avg | Phase 1.0 impact: +5-9 days, net benefit risk reduction |
 
 **Critical Path**: Phase 1.0 (2-3 days) → MVP Phase 1 (12-16 days) → Phase 2 (weeks 4-6) → Phase 3 (weeks 7-9) → Phase 4 (weeks 10-12)
 
