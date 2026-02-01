@@ -2,7 +2,8 @@
 
 **Last Updated**: 2026-01-31
 **Status**: GO - Architecture sound, ready for implementation
-**Timeline**: 12 weeks to production (MVP in 10-12 days)
+**Timeline**: 12 weeks to production (MVP in 15-21 days with Phase 1.0 setup)
+**Revision**: Updated with Phase 1.0 pre-phase setup and realistic timeline (see MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md)
 
 ## Executive Summary
 
@@ -26,6 +27,13 @@
 **Team**: 2-2.5 FTE engineers
 **Estimated Cost Savings**: 60-70% vs. baseline through caching + warm pools
 
+**CRITICAL UPDATE - Timeline Revised**:
+- **Original Phase 1 estimate**: 10-12 days (OPTIMISTIC)
+- **Revised Phase 1.0 (Pre-Phase)**: 2-3 days (mcp-vector-search setup + verification)
+- **Revised Phase 1.1-1.8**: 12-16 days (realistic with dependencies)
+- **Total to MVP**: 15-21 calendar days (more realistic, lower risk)
+- **See docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md for details**
+
 ---
 
 ## Phase 1: Foundation (Weeks 1-3) - MVP CORE RESEARCH LOOP
@@ -42,37 +50,154 @@ Build minimal end-to-end flow: create session → index content → search → a
 - SQLite for session storage
 - ChromaDB (included in mcp-vector-search)
 
-### 1.1: Service Architecture Setup (3-4 days)
+---
 
-**Deliverable**: FastAPI service scaffold with proper project structure
+## Phase 1.0: Pre-Phase Environment Setup (2-3 Days) - **CRITICAL**
+
+**IMPORTANT**: Phase 1.0 is a pre-phase task that MUST complete before Phase 1.1 begins. The original 10-12 day estimate was optimistic and didn't account for mcp-vector-search setup complexity. Phase 1.0 de-risks Phase 1.1-1.8 by validating environment and dependencies upfront.
+
+**Objective**: Verify mcp-vector-search is properly installed, configured, and tested. Establish baseline environment documentation.
+
+**See Also**: Complete Phase 1.0 guide at `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (3,600+ lines)
+
+### Tasks (2-3 Days Total)
+
+**1.0.1: Environment Prerequisites** (30 min)
+- Verify Python 3.12+ installed
+- Create/verify virtual environment
+- Check 3GB+ disk space available
+
+**1.0.2: Install mcp-vector-search** (2-4 hours) - CRITICAL BLOCKER
+- Add mcp-vector-search to pyproject.toml with pinned version
+- Run `uv sync` to install ~2.5GB of dependencies
+- Verify imports: `from mcp_vector_search import Client`
+- Verify transitive deps: transformers, torch, chromadb, sentence_transformers
+
+**1.0.3: Verify PostgreSQL** (1-2 hours)
+- Start PostgreSQL service
+- Test database connection
+- Run Alembic migrations (`alembic upgrade head`)
+- Verify tables exist (sessions, audit_logs)
+
+**1.0.4: Create Sandbox Directory** (1 hour)
+- Create `research-mind-service/app/sandbox/` directory
+- Create `__init__.py` for Python module
+
+**1.0.5: Test Model Caching** (1-2 hours) - Proof of Concept
+- Set HuggingFace cache environment variables
+- Download embedding model (all-MiniLM-L6-v2, ~400MB)
+- First run: 2-3 minutes (one-time)
+- Verify second run uses cache: <1 second
+- Document performance baseline
+
+**1.0.6: Session Model Stub** (1-2 hours)
+- Create `app/models/session.py` stub (will be completed in Phase 1.2)
+
+**1.0.7: Verify Docker** (1 hour)
+- Check Docker and docker-compose installed
+- Validate `docker-compose.yml` configuration
+
+**1.0.8: Document Baseline** (2-4 hours)
+- Create `.env.example` template
+- Create `docs/PHASE_1_0_BASELINE.md` documenting:
+  - System environment (Python version, OS, disk space)
+  - Package versions
+  - Performance baselines
+  - Known issues discovered
+  - Risk assessments
+
+### Critical Integration Patterns Established in Phase 1.0
+
+**Pattern 1: Singleton ChromaDB Manager**
+- Load model ONCE per service startup (~30s first run)
+- Reuse in-memory for all requests (<1ms subsequent)
+- Foundation for Phase 1.1 implementation
+
+**Pattern 2: Session-Scoped Collections**
+- Each session gets isolated ChromaDB collection: `session_{session_id}`
+- Shared ChromaDB instance, isolated collections
+- Verified in Phase 1.0 concurrent access testing
+
+**Pattern 3: Model Caching**
+- HuggingFace cache via environment variables
+- TRANSFORMERS_CACHE, HF_HOME, HF_HUB_CACHE
+- Avoids re-downloading 400MB model on subsequent runs
+
+### Phase 1.0 Success Criteria
+
+- ✅ mcp-vector-search installed and imports working
+- ✅ Model download completes (2-3 min first run)
+- ✅ PostgreSQL connected and migrations applied
+- ✅ Sandbox directory structure created
+- ✅ Docker/docker-compose verified
+- ✅ Baseline environment documented
+- ✅ Known issues and mitigations captured
+- ✅ Team consensus on Phase 1.0 findings and risks
+
+### Phase 1.0 Artifacts
+
+1. Updated `pyproject.toml` with mcp-vector-search dependency
+2. `.env.example` template with all required variables
+3. `docs/PHASE_1_0_BASELINE.md` - environment documentation
+4. `scripts/verify-phase-1-0.sh` - automated verification script
+5. Troubleshooting guide for 5 common installation issues
+
+### Risk Mitigations Established in Phase 1.0
+
+- ✅ Concurrent ChromaDB access verified (safe for per-session collections)
+- ✅ Model caching performance proven
+- ✅ Environment setup documented (prevent Phase 1.1 surprises)
+- ✅ Installation issues discovered and mitigated
+- ✅ Realistic timeline adjustments made (10-12 → 15-21 days)
+
+---
+
+### 1.1: Service Architecture Setup (5-6 days) - REVISED UP FROM 3-4
+
+**Note**: Phase 1.0 pre-phase has already:
+- ✅ Installed mcp-vector-search library (~2.5GB)
+- ✅ Verified all dependencies
+- ✅ Created pyproject.toml with mcp-vector-search
+- ✅ Created .env.example
+- ✅ Created app/sandbox/ directory
+
+**Phase 1.1 builds on Phase 1.0 foundation.**
+
+**Deliverable**: FastAPI service scaffold with proper project structure and mcp-vector-search integration
 
 **Tasks**:
 
 1. Create FastAPI service skeleton at `research-mind-service/`
 2. Set up project structure:
-   - `app/main.py` - FastAPI entry point
+   - `app/main.py` - FastAPI entry point with startup/shutdown hooks
+   - `app/core/vector_search.py` - VectorSearchManager singleton (lazy-load model)
    - `app/routes/` - API endpoints
    - `app/services/` - Business logic
    - `app/schemas/` - Pydantic models
    - `app/models/` - Database models
-   - `app/sandbox/` - Security/isolation
+   - `app/sandbox/` - Security/isolation (directory already exists from Phase 1.0)
    - `tests/` - Test suite
-3. Add mcp-vector-search to `pyproject.toml` as dependency (~2.5GB disk space required)
-4. Create `.env.example` with service configuration
-5. Set up Docker/docker-compose for local development
+3. Implement VectorSearchManager singleton for mcp-vector-search:
+   - Load embedding model once per startup (~30s, then cached)
+   - Provide per-session SessionIndexer wrapper
+   - Environment-based configuration (cache dirs, model name, device)
+4. Integrate with FastAPI startup/shutdown hooks
+5. Update Dockerfile for multi-stage build with mcp-vector-search
 
 **Critical Files to Create**:
 
-- `research-mind-service/pyproject.toml` - dependency management (add mcp-vector-search)
-- `research-mind-service/app/main.py` - FastAPI app with middleware
-- `research-mind-service/Dockerfile` - service containerization
+- `research-mind-service/app/main.py` - FastAPI app with VectorSearchManager initialization
+- `research-mind-service/app/core/vector_search.py` - VectorSearchManager singleton (see MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md Section 4 for template)
+- `research-mind-service/app/core/config.py` - Pydantic Settings for environment loading
 
 **Success Criteria**:
 
 - ✅ Service starts on port 15010
 - ✅ GET /api/health returns `{"status": "healthy"}`
-- ✅ mcp-vector-search library imports successfully
-- ✅ All dependencies in pyproject.toml
+- ✅ VectorSearchManager singleton initializes on startup
+- ✅ Embedding model loads successfully (30s on first run, then cached)
+- ✅ All environment variables configurable via .env
+- ✅ Docker image builds successfully with mcp-vector-search
 
 ---
 
@@ -120,17 +245,27 @@ Build minimal end-to-end flow: create session → index content → search → a
 
 ---
 
-### 1.3: Vector Search REST API (Wrapper) (4-5 days)
+### 1.3: Vector Search REST API (Wrapper) (5-6 days) - REVISED UP FROM 4-5
 
 **Deliverable**: REST interface to mcp-vector-search with per-session indexing and search
 
+**Note**: Phase 1.0 has already proven:
+- ✅ mcp-vector-search library is installable and working
+- ✅ ChromaDB concurrent write safety (tested with multiple collections)
+- ✅ Model caching via environment variables works
+- ✅ Session-scoped collection approach is sound
+
+**Phase 1.3 extends this foundation with REST API layer.**
+
 **Tasks**:
 
-1. Create thin FastAPI wrappers around mcp-vector-search library
+1. Create SessionIndexer wrapper (see MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md Section 4):
 
    - **DO NOT** re-implement indexing (use mcp-vector-search's SemanticIndexer directly)
    - **DO NOT** build custom job queue (mcp-vector-search provides it)
-   - Create wrapper that manages session scoping + provides REST interface
+   - Create thin wrapper that manages session scoping + provides REST interface
+   - Use global VectorSearchManager singleton (initialized in Phase 1.1)
+   - Per-session collection naming: `session_{session_id}`
 
 2. Implement indexing endpoints:
 
@@ -147,33 +282,41 @@ Build minimal end-to-end flow: create session → index content → search → a
    - Each session gets dedicated ChromaDB collection: `session_{session_id}`
    - Collections in shared ChromaDB instance (one process-wide db)
    - Session isolation via collection_name parameter (already parameterizable in mcp-vector-search)
+   - Concurrent access verified safe in Phase 1.0 testing
 
-**Architecture Pattern**:
+**Architecture Pattern** (from MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md):
 
 ```python
-from mcp_vector_search import SemanticIndexer, SemanticSearchEngine
+from app.core.vector_search import VectorSearchManager
 
 class SessionIndexer:
     def __init__(self, session_id: str, session_root: Path):
+        self.session_id = session_id
         self.collection_name = f"session_{session_id}"
-        # Direct calls to mcp-vector-search APIs
-        self.indexer = SemanticIndexer(
-            database=ChromaVectorDatabase(...),
-            project_root=session_root
+        self._vs_manager = VectorSearchManager()  # Singleton
+
+    async def index_directory(self, path: Path) -> dict:
+        # Delegate to mcp-vector-search with session scoping
+        result = await self._vs_manager.indexer.index_directory(
+            path=path,
+            session_id=self.session_id,
+            collection_name=self.collection_name
         )
+        return {"status": "success", "job_id": result.get("job_id")}
 
-    async def index(self, force: bool = False):
-        # Direct delegation to mcp-vector-search
-        return await self.indexer.index_directory(force=force)
-
-    async def search(self, query: str, limit: int = 10):
-        # Direct delegation to mcp-vector-search
-        return await SemanticSearchEngine(...).search(query, limit=limit)
+    async def search(self, query: str, limit: int = 10) -> dict:
+        # Delegate to mcp-vector-search with session scoping
+        results = await self._vs_manager.search_engine.search(
+            query=query,
+            collection_name=self.collection_name,
+            top_k=limit
+        )
+        return {"results": results, "count": len(results)}
 ```
 
 **Critical Files to Create**:
 
-- `research-mind-service/app/services/session_indexer.py` - wrapper around mcp-vector-search
+- `research-mind-service/app/core/session_indexer.py` - SessionIndexer wrapper (use template from MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md Section 4)
 - `research-mind-service/app/routes/vector_search.py` - REST endpoints
 - `research-mind-service/app/schemas/vector_search.py` - Pydantic request/response models
 
@@ -259,7 +402,7 @@ class SessionIndexer:
 
 ---
 
-### 1.6: Agent Integration (4-5 days)
+### 1.6: Agent Integration (5-7 days) - REVISED UP FROM 4-5
 
 **Deliverable**: Claude-ppm agent invocation with session scoping
 
@@ -305,9 +448,16 @@ class SessionIndexer:
 
 ---
 
-### 1.7: Integration Tests (4 days)
+### 1.7: Integration Tests (5-7 days) - REVISED UP FROM 4 DAYS
 
-**Deliverable**: Comprehensive test suite validating MVP functionality
+**Deliverable**: Comprehensive test suite validating MVP functionality with security focus
+
+**Note**: Security testing is more involved than initially estimated. Includes:
+- Path traversal fuzzing
+- Concurrent access verification
+- Cross-session contamination prevention
+- Agent containment verification
+- Audit logging validation
 
 **Tasks**:
 
@@ -326,25 +476,39 @@ class SessionIndexer:
    - Index different content in each
    - Verify search in session 1 only returns session 1 results
    - Verify agent in session 1 cannot access session 2 files
+   - Test concurrent indexing (multiple sessions simultaneously)
+   - ChromaDB concurrent write safety verification (from Phase 1.0 testing)
 
-3. Error case tests:
+3. Security tests (CRITICAL):
+   - Path traversal attempts: `../../../etc/passwd`, symlinks, etc. (fuzzing)
+   - Hidden file access blocked (dotfiles, .env, etc.)
+   - Session validation on every request
    - Invalid session_id → 404
    - Expired session → 410
-   - Path traversal attempt → blocked + logged
+   - Audit logging captures all attempts (successful and failed)
+   - Agent network isolation verified
+
+4. Error case tests:
    - Indexing timeout → error returned
+   - Missing workspace → handled gracefully
+   - ChromaDB corruption → recovery tested
+   - Model download failure → fallback tested
 
 **Critical Files to Create**:
 
 - `research-mind-service/tests/test_integration_e2e.py` - end-to-end tests
 - `research-mind-service/tests/test_isolation.py` - isolation verification
-- `research-mind-service/tests/test_security.py` - security tests
+- `research-mind-service/tests/test_security.py` - security tests (path traversal, isolation)
+- `research-mind-service/tests/test_concurrent_access.py` - concurrent indexing safety
 
 **Success Criteria**:
 
 - ✅ All tests pass (>90% coverage)
 - ✅ End-to-end flow works (session → index → search → analyze)
-- ✅ Cross-session isolation verified (100%)
-- ✅ Security tests confirm path traversal blocked
+- ✅ Cross-session isolation verified (100% separation)
+- ✅ Path traversal blocked (100% detection rate)
+- ✅ Concurrent access safe (verified in Phase 1.0 + retested in Phase 1.7)
+- ✅ Security audit ready for stakeholder review
 
 ---
 
@@ -696,15 +860,19 @@ The following are the **top priority files** to implement first:
 
 ## Timeline & Effort Estimates
 
-| Phase             | Weeks    | Components                                             | Effort     | Team          | Notes                                            |
-| ----------------- | -------- | ------------------------------------------------------ | ---------- | ------------- | ------------------------------------------------ |
-| **MVP (Phase 1)** | 1-3      | Service arch, sessions, indexing, search, agent, tests | 10-12 days | 2 FTE         | **CRITICAL PATH** - Blocks all subsequent phases |
-| **Phase 2**       | 4-6      | Incremental indexing, caching, filtering, warm pools   | 3 weeks    | 1.5 FTE       | Parallel with initial user feedback              |
-| **Phase 3**       | 7-9      | Reranking, dedup, UX polish                            | 3 weeks    | 1 FTE         | Quality improvements                             |
-| **Phase 4**       | 10-12    | K8s, multi-instance, hardening                         | 3 weeks    | 2 FTE         | Production hardening                             |
-| **Total**         | 12 weeks | Production-ready system                                | 12 weeks   | 2-2.5 FTE avg | Can achieve MVP in 10-12 calendar days           |
+| Phase             | Weeks    | Components                                             | Effort      | Team          | Notes                                            |
+| ----------------- | -------- | ------------------------------------------------------ | ----------- | ------------- | ------------------------------------------------ |
+| **Phase 1.0** | Pre-1 | Environment setup, mcp-vector-search install, verification | 2-3 days   | 1 FTE         | **CRITICAL** - Must complete before Phase 1.1   |
+| **MVP (Phase 1)** | 1-3      | Service arch, sessions, indexing, search, agent, tests | 12-16 days  | 2 FTE         | **CRITICAL PATH** - Blocks all subsequent phases |
+| **Total to MVP** | - | Phase 1.0 + Phase 1 combined | **15-21 days** | 2 FTE | More realistic than original 10-12 day estimate |
+| **Phase 2**       | 4-6      | Incremental indexing, caching, filtering, warm pools   | 3 weeks     | 1.5 FTE       | Parallel with initial user feedback              |
+| **Phase 3**       | 7-9      | Reranking, dedup, UX polish                            | 3 weeks     | 1 FTE         | Quality improvements                             |
+| **Phase 4**       | 10-12    | K8s, multi-instance, hardening                         | 3 weeks     | 2 FTE         | Production hardening                             |
+| **Total to Prod** | 12 weeks | Production-ready system                                | 12 weeks    | 2-2.5 FTE avg | Phase 1.0 impact: +5-9 days, net benefit risk reduction |
 
-**Critical Path**: MVP (weeks 1-3) → Phase 2 cost optimization (weeks 4-6) → Phase 3 quality (weeks 7-9)
+**Critical Path**: Phase 1.0 (2-3 days) → MVP Phase 1 (12-16 days) → Phase 2 (weeks 4-6) → Phase 3 (weeks 7-9) → Phase 4 (weeks 10-12)
+
+**Important**: Original 10-12 day MVP estimate was optimistic. Realistic timeline with Phase 1.0 is 15-21 days. Phase 1.0 adds 2-3 days but saves 3-5 days of Phase 1.1 troubleshooting (net benefit).
 
 **Parallel Tracks**:
 
@@ -798,27 +966,64 @@ Phase 4 (Operations/Scale)
 
 ## Implementation Order (Day by Day)
 
-### Week 1: Foundation
+### Pre-Week 1: Phase 1.0 Environment Setup (2-3 Days)
 
-- **Day 1-2**: Service Architecture (1.1) + pyproject.toml
+**CRITICAL - Must complete before Phase 1 formal kickoff**
+
+- **Day -3 to -1**:
+  - Install mcp-vector-search library (~2.5GB)
+  - Verify Python 3.12+ and virtual environment
+  - Test PostgreSQL connection and migrations
+  - Create app/sandbox/ directory
+  - Test model caching (embedding download + cache verification)
+  - Create .env.example and PHASE_1_0_BASELINE.md
+  - All verification tests must pass
+  - **Approval gate**: Engineering team signs off on Phase 1.0 findings
+
+### Week 1: Foundation (Service Architecture + Sessions)
+
+- **Day 1-2**: Service Architecture (1.1) - FastAPI setup + VectorSearchManager singleton
+  - VectorSearchManager loads model on startup (~30s first run, cached after)
+  - Set up configuration system (Pydantic Settings)
 - **Day 3-4**: Session Management (1.2)
+  - Session database model
+  - CRUD endpoints
+  - Workspace directory initialization
 - **Day 5**: Path Validator (1.4) - do early for security
+  - Path validation logic
+  - FastAPI middleware integration
 
-### Week 2: Search Integration
+### Week 2: Search Integration + Audit
 
-- **Day 6-10**: Vector Search REST API (1.3)
-- **Day 11**: Audit Logging (1.5)
+- **Day 6-11**: Vector Search REST API (1.3) (5-6 days, revised up)
+  - SessionIndexer wrapper around VectorSearchManager
+  - Index and search endpoints
+  - Per-session collection management
+  - Job progress tracking
+- **Day 11-12**: Audit Logging (1.5)
+  - Audit log model
+  - Logging for all operations
 
-### Week 3: Agent + Tests
+### Week 3: Agent Integration + Tests + Release
 
-- **Day 12-15**: Agent Integration (1.6)
-- **Day 16-19**: Integration Tests (1.7)
-- **Day 20**: Documentation & Release (1.8)
+- **Day 13-18**: Agent Integration (1.6) (5-7 days, revised up)
+  - research-analyst agent definition
+  - Agent runner with subprocess isolation
+  - Analysis endpoint
+- **Day 19-25**: Integration Tests (1.7) (5-7 days, revised up)
+  - End-to-end tests
+  - Isolation tests
+  - **Security tests** (path traversal, concurrent access, etc.)
+  - Concurrent access validation
+- **Day 26-27**: Documentation & Release (1.8)
+  - README, API contract, deployment guide
+  - Docker Compose local dev
+  - Code complete
 
 ### Weeks 4-12: Optimization & Production
 
-- Weeks 4-6: Phase 2 (Cost/Quality)
-- Weeks 7-9: Phase 3 (Reranking/UX)
+- Weeks 4-6: Phase 2 (Cost/Quality Optimizations)
+- Weeks 7-9: Phase 3 (Reranking/UX Polish)
 - Weeks 10-12: Phase 4 (Operations/Scale)
 
 ---
@@ -853,14 +1058,37 @@ Phase 4 (Operations/Scale)
 
 ## Next Steps
 
-1. **Immediate**: Create pyproject.toml with mcp-vector-search dependency
-2. **Day 1-2**: Implement Phase 1.1 (Service Architecture)
-3. **Day 3-4**: Implement Phase 1.2 (Session Management)
-4. **Day 5**: Implement Phase 1.4 (Path Validator) - security critical
-5. **Day 6-10**: Implement Phase 1.3 (Vector Search REST API)
-6. **Day 11-15**: Implement Phase 1.5 (Audit) + 1.6 (Agent Integration)
-7. **Day 16-20**: Implement Phase 1.7 (Tests) + 1.8 (Release)
-8. **Week 4+**: Begin Phase 2 (Cost/Quality Optimizations)
+### Immediate Actions (Before Phase 1.0)
+
+1. **Review Phase 1.0 Guide**: Read `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (3,600+ lines)
+2. **Approval Gate**: Team reviews PLAN_VS_RESEARCH_ANALYSIS.md findings and Phase 1.0 timeline
+3. **Execute Phase 1.0**: Run pre-phase environment setup (2-3 days)
+   - Install mcp-vector-search (~2.5GB)
+   - Verify all dependencies
+   - Run verification script
+   - Create PHASE_1_0_BASELINE.md
+   - Sign off on findings
+
+### Phase 1 Implementation (after Phase 1.0 complete)
+
+1. **Day 1-2**: Implement Phase 1.1 (Service Architecture)
+   - FastAPI app with VectorSearchManager singleton
+   - Use template from MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md Section 4
+2. **Day 3-4**: Implement Phase 1.2 (Session Management)
+3. **Day 5**: Implement Phase 1.4 (Path Validator) - security critical
+4. **Day 6-11**: Implement Phase 1.3 (Vector Search REST API)
+   - SessionIndexer wrapper (template in integration guide)
+5. **Day 11-12**: Implement Phase 1.5 (Audit Logging)
+6. **Day 13-18**: Implement Phase 1.6 (Agent Integration)
+7. **Day 19-25**: Implement Phase 1.7 (Integration Tests) with security focus
+8. **Day 26-27**: Implement Phase 1.8 (Documentation & Release)
+9. **Week 4+**: Begin Phase 2 (Cost/Quality Optimizations)
+
+### Key Documents & Resources
+
+- **MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md**: Complete Phase 1.0 setup with code templates
+- **PLAN_VS_RESEARCH_ANALYSIS.md**: Gap analysis and justification for timeline changes
+- **PHASE_1_0_BASELINE.md**: (To be created during Phase 1.0) Environment documentation
 
 ---
 
