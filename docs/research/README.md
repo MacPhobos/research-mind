@@ -4,13 +4,52 @@
 
 This directory contains comprehensive research and architectural analysis for the Research-Mind project, a session-scoped research system combining semantic code search (mcp-vector-search) with agentic question-answering (claude-mpm).
 
-**Research Completed**: 2026-01-30
-**Total Documentation**: 4,357 lines across 5 documents
-**Status**: Ready for implementation
+**Research Completed**: 2026-01-31
+**Total Documentation**: 5,745 lines across 6 documents
+**Status**: Ready for implementation - Includes packaging/installation guide
 
 ---
 
-## Documents
+## Current Integration Approach (Updated 2026-02-01)
+
+### ✅ SUBPROCESS-BASED ARCHITECTURE
+
+**The correct approach**: research-mind-service spawns **mcp-vector-search CLI as subprocess** on demand.
+
+**Key Documents**:
+
+1. **docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md** (Version 2.0 - CURRENT)
+
+   - Subprocess-based integration (definitive guide)
+   - Python code examples and patterns
+   - FastAPI integration examples
+   - Error handling and troubleshooting
+
+2. **docs/research2/mcp-vector-search-subprocess-integration-research.md** (Complete Research)
+   - Full CLI reference and testing results
+   - Isolation verification
+   - Performance baselines
+   - Implementation recommendations
+
+---
+
+## Legacy Documents (For Reference Only)
+
+### 0. **mcp-vector-search-packaging-installation.md** (1,388 lines) - DEPRECATED
+
+❌ **INCORRECT APPROACH** - Describes library embedding (not used)
+
+Legacy documentation for integrating mcp-vector-search as Python library (approach abandoned).
+
+**Why Deprecated**:
+
+- mcp-vector-search does NOT expose embeddable classes (ChromaDB, VectorSearchManager)
+- Subprocess approach is simpler, safer, and production-ready
+- See current guide instead
+
+**For**: Historical reference only - DO NOT USE FOR IMPLEMENTATION
+
+---
 
 ### 1. **mcp-vector-search-capabilities.md** (680 lines)
 
