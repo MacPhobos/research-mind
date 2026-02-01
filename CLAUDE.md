@@ -1,20 +1,29 @@
-# research-mind Monorepo Development Guide
+# research-mind Monorepo
+
+## Overview
+
+This monorepo contains:
+
+- **research-mind-service/**: Python FastAPI backend
+- **research-mind-ui/**: SvelteKit TypeScript frontend
+- **docs/**: Shared documentation
+
+**For project-specific development**:
+
+- Backend patterns: See `research-mind-service/CLAUDE.md`
+- Frontend patterns: See `research-mind-ui/CLAUDE.md`
 
 ## Quick Start
 
 ```bash
-make install
-make dev
+make install    # Install dependencies for both projects
+make dev        # Start backend and frontend
 ```
 
-Service: http://localhost:15010
-UI: http://localhost:15000
+**URLs**:
 
-## Project Structure
-
-- **research-mind-service/**: Python FastAPI backend
-- **research-mind-ui/**: SvelteKit TypeScript frontend
-- **docs/**: Shared documentation + API contract
+- Service: http://localhost:15010
+- UI: http://localhost:15000
 
 ## The Golden Rule: API Contract is FROZEN
 
@@ -25,7 +34,7 @@ UI: http://localhost:15000
 
 The API contract is the **single source of truth** for all communication between service and UI. All changes must flow through the contract first.
 
-### Contract Synchronization Workflow (ONE WAY ONLY)
+### Contract Synchronization Workflow
 
 **Backend → Frontend (strict ordering)**
 
@@ -40,127 +49,73 @@ The API contract is the **single source of truth** for all communication between
 7. **Update frontend code**: Use new generated types in components
 8. **Run frontend tests**: `make test` (all tests pass)
 
-**NEVER**:
+**Critical Rules**:
 
-- Manually edit `src/lib/api/generated.ts` (auto-generated)
-- Update service without updating contract first
-- Deploy frontend without regenerating types after backend changes
-- Let the two `api-contract.md` files diverge
-- Change API without version bump if breaking
+- Both `api-contract.md` files must be identical
+- Never manually edit `src/lib/api/generated.ts` (auto-generated)
+- Update service contract BEFORE implementing changes
+- Deploy frontend only after regenerating types
+- Version bump required for breaking changes
+
+For detailed implementation workflows:
+
+- Service side: See `research-mind-service/CLAUDE.md`
+- UI side: See `research-mind-ui/CLAUDE.md`
 
 ### Contract Change Checklist
 
 When modifying the API:
 
 - [ ] Updated `research-mind-service/docs/api-contract.md`
-- [ ] Version bumped (major/minor/patch as appropriate)
+- [ ] Version bumped (major/minor/patch)
 - [ ] Changelog entry added
 - [ ] Backend schemas/models updated
-- [ ] Backend tests pass (`make test`)
+- [ ] Backend tests pass
 - [ ] Contract copied to `research-mind-ui/docs/api-contract.md`
-- [ ] Frontend types regenerated (`make gen-client`)
-- [ ] Frontend code updated to use new types
-- [ ] Frontend tests pass (`make test`)
+- [ ] Frontend types regenerated
+- [ ] Frontend code updated
+- [ ] Frontend tests pass
 - [ ] Both `api-contract.md` files are identical
 
-## Configuration
+## Cross-Project Configuration
 
-### Service Port: 15010
+### Port Configuration
 
-- Change in root `.env` and `docker-compose.yml`
-- Update UI's `VITE_API_BASE_URL`
+- **Service**: 15010 (change in root `.env`, `docker-compose.yml`, and UI's `VITE_API_BASE_URL`)
+- **UI**: 15000 (change in `research-mind-ui/.env` and service CORS config)
 
-### UI Port: 15000
-
-- Change in research-mind-ui/.env
-- CORS may need adjustment in service
-
-### Database
-
-- Default: Postgres (port 5432, user: postgres)
-- Reset with: `make db-reset`
-
-## Common Tasks
-
-```bash
-make dev              # Start everything
-make stop             # Stop everything
-make test             # Run all tests
-make lint             # Check code quality
-make gen-client       # Regenerate TS client from OpenAPI
-make db-reset         # Drop and recreate database
-```
-
-## Type Generation (OpenAPI → TypeScript)
+### Type Generation Workflow
 
 The frontend generates TypeScript types from the backend's OpenAPI schema:
 
-### How It Works
-
-1. **Backend** (FastAPI):
-
-   - OpenAPI spec auto-generated at `http://localhost:15010/openapi.json`
-   - Based on Pydantic models in `app/schemas/`
-
-2. **Type Generation**:
-
-   - Script: `npm run gen:api` (in `research-mind-ui/`)
-   - Command: `openapi-typescript http://localhost:15010/openapi.json -o src/lib/api/generated.ts`
-   - Output: `src/lib/api/generated.ts` (auto-generated, DO NOT EDIT)
-
-3. **Frontend Usage**:
-
-   ```typescript
-   import type { Session, IndexingJob, SearchResult } from "$lib/api/generated";
-
-   // These types are guaranteed to match the backend
-   const session: Session = await fetch("/api/v1/sessions/123").then((r) =>
-     r.json(),
-   );
-   ```
-
-### Workflow
-
 ```
-Service schema change
+Backend schema change
     ↓
-Backend test passes
+Backend tests pass
     ↓
-npm run gen:api
+make gen-client
     ↓
 Types updated automatically
     ↓
-UI code updated
+Frontend code updated
     ↓
-Frontend test passes
+Frontend tests pass
 ```
 
-**Important**: Generated types are always in sync with backend because they're derived from OpenAPI schema.
+Generated types (`src/lib/api/generated.ts`) are always in sync with backend because they're derived from OpenAPI spec at `http://localhost:15010/openapi.json`.
 
-## Adding a New Endpoint
+## Common Monorepo Tasks
 
-1. **Service**:
+```bash
+make dev              # Start both backend and frontend
+make stop             # Stop all services
+make test             # Run tests for both projects
+make lint             # Check code quality (both projects)
+make gen-client       # Regenerate TypeScript types from OpenAPI
+make db-reset         # Drop and recreate database
+```
 
-   - Add route in `research-mind-service/app/routes/`
-   - Add Pydantic models in `research-mind-service/app/schemas/`
-   - Write test in `research-mind-service/tests/`
-   - Update `docs/api-contract.md`
-
-2. **UI**:
-   - Copy contract to `research-mind-ui/docs/api-contract.md`
-   - Run `make gen-client`
-   - Use generated types in UI components
-
-## Guard Rails
-
-- **No `.env` in git**: Use `.env.example` only
-- **Migrations required**: All schema changes via Alembic
-- **Type safety**: Generated TypeScript types (no hand-rolled fetch)
-- **Tests required**: >1 test per component
-- **Ports must differ**: Service ≠ UI port
-- **Contract frozen**: Never deviate from `api-contract.md`
-- **Version bump required**: Any API change requires contract version bump
-- **Both repos sync**: Contract must be identical in both service and UI
+For project-specific commands, see sub-project CLAUDE.md files.
 
 ## API Versioning
 
@@ -172,14 +127,23 @@ The API uses `/api/v1` prefix. Future versions will use `/api/v2`, `/api/v3`, et
 - **Minor** (1.0.0 → 1.1.0): New endpoints or new optional fields
 - **Patch** (1.0.0 → 1.0.1): Bug fixes, documentation updates
 
-### Deployment Safety
+## Deployment Order
 
 Always deploy in this order:
 
 1. **Backend first** with new/updated endpoints
-2. **Frontend** regenerated types, code updated
+2. **Frontend second** with regenerated types and updated code
 3. Never deploy frontend without updated types
 4. Use feature flags for gradual rollout of breaking changes
+
+## Guard Rails (Cross-Project)
+
+- **No `.env` in git**: Use `.env.example` only
+- **Contract frozen**: Both `api-contract.md` files must be identical
+- **Version bump required**: Any API change requires contract version bump
+- **Backend first**: Always deploy backend before frontend
+- **Tests required**: All tests must pass before deployment
+- **Type safety**: Use generated TypeScript types (never hand-rolled fetch)
 
 ## Non-Goals
 
