@@ -1,9 +1,9 @@
 # Phase 1.6: Agent Integration
 
 **Subphase**: 1.6 of 8 (Phase 1)
-**Status**: DEFERRED TO PHASE 2
+**Status**: DEFERRED TO FUTURE PHASE
 
-> **DEFERRAL NOTICE**: This subphase is deferred to Phase 2.
+> **DEFERRAL NOTICE**: This subphase is deferred to a future phase.
 > Agent integration depends on search functionality, which is out of scope
 > for Phase 1 under the subprocess-based architecture.
 >
@@ -27,13 +27,13 @@
 
 The original Phase 1.6 design assumed:
 
-1. **Search API available in Phase 1**: The agent would call search endpoints to find relevant code, then synthesize results. Under the subprocess-based architecture, search is deferred to Phase 2.
+1. **Search API available in Phase 1**: The agent would call search endpoints to find relevant code, then synthesize results. Under the subprocess-based architecture, search is deferred to a future phase.
 
 2. **Embedded vector search**: The agent would use in-process search via VectorSearchManager. This is incorrect - mcp-vector-search runs as a subprocess, not an embedded library.
 
 3. **Direct API calls**: Agent would make REST calls to search endpoints. Instead, search will go through Claude Code's native MCP interface.
 
-**Correct Architecture (Phase 2)**:
+**Correct Architecture (future phase)**:
 
 ```
 User Question
@@ -47,16 +47,16 @@ Claude Code Agent
 
 ---
 
-## Phase 2 Design Notes
+## Future Phase Design Notes
 
-When this subphase is implemented in Phase 2, the architecture will differ significantly from the original plan:
+When this subphase is implemented in a future phase, the architecture will differ significantly from the original plan:
 
 ### Search via MCP (Not REST)
 
 Search queries will use Claude Code's native MCP interface to communicate with mcp-vector-search. The research-mind-service will NOT wrap search in a REST API.
 
 ```
-Phase 2 Architecture:
+Future Phase Architecture:
   research-mind-service
     └── POST /api/v1/workspaces/{id}/analyze
         └── Spawns Claude Code agent subprocess
@@ -80,7 +80,7 @@ The citation extraction pattern from the original plan remains valid:
 - Parse agent response for file:line_number references
 - Return structured citations in API response
 
-### Dependencies for Phase 2
+### Dependencies for Future Implementation
 
 Before this subphase can begin:
 
@@ -103,14 +103,14 @@ Integration tests should be scoped to:
 - Audit logging
 
 End-to-end test flow is now: **create session -> index workspace -> verify indexed**
-(Search and analyze are Phase 2)
+(Search and analyze are deferred to a future phase)
 
 ### Phase 1.8 (Documentation)
 
 Documentation should reflect:
 
 - Phase 1 delivers workspace registration and indexing
-- Search and analysis are Phase 2 features
+- Search and analysis are deferred to a future phase
 - API endpoints limited to session CRUD + indexing operations
 
 ### Phase 1 Critical Path
@@ -123,12 +123,12 @@ With 1.6 deferred, the Phase 1 critical path is shorter:
 
 ---
 
-## Original Effort Estimates (Preserved for Phase 2 Planning)
+## Original Effort Estimates (Preserved for Future Planning)
 
 - **Duration**: 5-7 business days
 - **Effort**: 40-56 hours
 - **Team Size**: 2 FTE engineers
-- **Prerequisite**: Phase 1.1 (FastAPI), Phase 2 search via MCP
+- **Prerequisite**: Phase 1.1 (FastAPI), future phase search via MCP
 
 ### Original Deliverables (Preserved)
 
@@ -141,7 +141,7 @@ With 1.6 deferred, the Phase 1 critical path is shorter:
 
 ## Summary
 
-**Phase 1.6 is DEFERRED TO PHASE 2** because:
+**Phase 1.6 is DEFERRED TO FUTURE PHASE** because:
 
 1. Agent integration depends on search, which is deferred
 2. Search will use Claude Code MCP interface (not REST API)
@@ -150,12 +150,12 @@ With 1.6 deferred, the Phase 1 critical path is shorter:
 
 The agent sandbox design, citation extraction, and subprocess execution patterns
 from the original plan remain valid and will be adapted for the MCP-based
-architecture in Phase 2.
+architecture in a future phase.
 
 ---
 
 **Document Version**: 2.0
 **Last Updated**: 2026-02-01
-**Status**: DEFERRED TO PHASE 2
+**Status**: DEFERRED TO FUTURE PHASE
 **Architecture**: Subprocess-based (replaces v1.0 library embedding approach)
 **Parent**: 01-PHASE_1_FOUNDATION.md

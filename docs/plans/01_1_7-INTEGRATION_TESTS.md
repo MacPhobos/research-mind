@@ -4,7 +4,7 @@
 **Duration**: 5-7 business days
 **Effort**: 40-56 hours
 **Team Size**: 1-2 FTE engineers
-**Prerequisite**: Phase 1.1-1.5 complete (Phase 1.6 Agent Integration deferred to Phase 2)
+**Prerequisite**: Phase 1.1-1.5 complete (Phase 1.6 Agent Integration deferred to a future phase)
 **Blocking**: 1.8
 **Status**: CRITICAL - MVP validation
 
@@ -34,7 +34,7 @@ Comprehensive integration testing validating end-to-end research loop, cross-ses
 - Verify subprocess exits with code 0
 - Verify `.mcp-vector-search/` directory exists after indexing
 - Verify index artifacts created (config.json, .chromadb/, cache/)
-- Search functionality deferred to Phase 2
+- Search functionality deferred to a future phase
 
 ### 2. Subprocess Invocation Tests
 
@@ -174,7 +174,7 @@ async def test_full_indexing_flow(test_client, test_workspace):
     assert index_dir.exists(), ".mcp-vector-search/ directory should exist after indexing"
     assert (index_dir / "config.json").exists(), "config.json should exist"
 
-    # 5. Search functionality deferred to Phase 2
+    # 5. Search functionality deferred to a future phase
 ```
 
 ### Subprocess Invocation Test Example
@@ -338,7 +338,7 @@ def test_path_traversal_blocked(test_client, test_session):
 - Concurrency safety verification (parallel subprocess execution)
 - > 90% code coverage
 
-Gates Phase 1 completion and enables Phase 2 search and optimization work.
+Gates Phase 1 completion and enables future search and optimization work.
 
 ---
 

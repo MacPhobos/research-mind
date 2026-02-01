@@ -1336,8 +1336,7 @@ For additional context and architectural decisions, refer to:
 - **[mcp-vector-search-capabilities.md](/Users/mac/workspace/research-mind/docs/research/mcp-vector-search-capabilities.md)**
   Detailed capabilities, limitations, and architecture of mcp-vector-search
 
-- **[mcp-vector-search-rest-api-proposal.md](/Users/mac/workspace/research-mind/docs/research/mcp-vector-search-rest-api-proposal.md)**
-  Proposal for REST API wrapper around mcp-vector-search
+- ~~**mcp-vector-search-rest-api-proposal.md**~~ (deleted - library-based approach was abandoned)
 
 - **[claude-mpm-sandbox-containment-plan.md](/Users/mac/workspace/research-mind/docs/research/claude-mpm-sandbox-containment-plan.md)**
   Sandbox isolation strategy for agentic analysis

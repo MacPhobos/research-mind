@@ -469,7 +469,7 @@ The frontend auto-generates TypeScript types from the backend's OpenAPI schema:
 ### Technical Research (Deep Dives)
 
 - **mcp-vector-search Capabilities**: [docs/research/mcp-vector-search-capabilities.md](/Users/mac/workspace/research-mind/docs/research/mcp-vector-search-capabilities.md) (680 lines)
-- **mcp-vector-search REST API Proposal**: [docs/research/mcp-vector-search-rest-api-proposal.md](/Users/mac/workspace/research-mind/docs/research/mcp-vector-search-rest-api-proposal.md) (1,015 lines)
+- ~~**mcp-vector-search REST API Proposal**~~: (deleted - library-based approach was abandoned in favor of subprocess architecture)
 - **claude-mpm Capabilities**: [docs/research/claude-mpm-capabilities.md](/Users/mac/workspace/research-mind/docs/research/claude-mpm-capabilities.md) (984 lines)
 - **claude-mpm Containment Plan**: [docs/research/claude-mpm-sandbox-containment-plan.md](/Users/mac/workspace/research-mind/docs/research/claude-mpm-sandbox-containment-plan.md) (918 lines)
 - **Combined Recommendations**: [docs/research/combined-architecture-recommendations.md](/Users/mac/workspace/research-mind/docs/research/combined-architecture-recommendations.md) (760 lines)

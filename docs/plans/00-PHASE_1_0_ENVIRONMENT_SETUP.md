@@ -984,13 +984,7 @@ Document addressing 5+ common issues:
 ### Secondary References
 
 - **docs/research/mcp-vector-search-capabilities.md** - Library architecture context
-- **IMPLEMENTATION_PLAN.md** - Original plan (Sections: Phase 1.0, Timeline & Effort)
-
-### Context Links
-
-- Original IMPLEMENTATION_PLAN.md Phase 1.0 section (lines 56-164)
-- Original IMPLEMENTATION_PLAN.md Timeline section (lines 862-877)
-- Original IMPLEMENTATION_PLAN.md Dependencies section (lines 886-919)
+- **IMPLEMENTATION_ROADMAP.md** - Master roadmap for Phase 1
 
 ---
 

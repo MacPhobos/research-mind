@@ -132,7 +132,7 @@ class Session(Base):
     A session represents an isolated workspace where users:
     1. Register a workspace directory
     2. Index content via mcp-vector-search subprocess
-    3. (Phase 2) Search indexed content via Claude Code MCP interface
+    3. (future phase) Search indexed content via Claude Code MCP interface
 
     Each session is 100% isolated:
     - Dedicated workspace directory
@@ -152,7 +152,7 @@ class Session(Base):
             - archived: session preserved but not active
             - deleted: session marked for cleanup
         archived: Boolean flag for soft-delete (complements status)
-        ttl_seconds: Time-to-live for session (Phase 2)
+        ttl_seconds: Time-to-live for session (future phase)
 
     Index Status:
         Determined at runtime by checking:
@@ -188,7 +188,7 @@ class Session(Base):
     )
     archived = Column(Boolean, nullable=False, default=False)
 
-    # TTL for cleanup (Phase 2)
+    # TTL for cleanup (future phase)
     ttl_seconds = Column(Integer, nullable=True, default=None)
 
     def __repr__(self):
@@ -393,7 +393,7 @@ class SessionListResponse(BaseModel):
 
 
 class UpdateSessionRequest(BaseModel):
-    """Request model for updating a session (Phase 2)."""
+    """Request model for updating a session (future phase)."""
 
     name: Optional[str] = Field(None, max_length=255, description="Updated name")
     description: Optional[str] = Field(None, max_length=1024, description="Updated description")
@@ -891,12 +891,6 @@ def test_session_index_status_reflects_filesystem():
 
 ### Primary References
 
-**docs/research/mcp-vector-search-rest-api-proposal.md** (Section 2.1)
-
-- Session Management Endpoints specification
-- Exact API contract for create, read, list, delete
-- Request/response schema designs
-
 **docs/research/claude-ppm-sandbox-containment-plan.md** (Section 2.2)
 
 - Session isolation requirements
@@ -911,7 +905,7 @@ def test_session_index_status_reflects_filesystem():
 
 ### Secondary References
 
-- **IMPLEMENTATION_PLAN.md** - Phase 1.2 section (lines 217-256)
+- **IMPLEMENTATION_ROADMAP.md** - Master roadmap for Phase 1
 - **01-PHASE_1_FOUNDATION.md** - Session management overview
 
 ---

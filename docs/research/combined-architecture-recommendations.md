@@ -1,835 +1,559 @@
 # Combined Architecture Recommendations
 
-**Document Version**: 1.1
-**Date**: 2026-01-31
-**Status**: Final Recommendations & Implementation Strategy
+**Document Version**: 2.0
+**Date**: 2026-02-01
+**Status**: Final Recommendations (Subprocess Architecture)
+**Supersedes**: v1.1 (library-embedding approach, deprecated)
 
 ---
 
-## Correction Note (v1.1)
+## Correction History
 
-**Date**: 2026-01-31
+**v2.0 (2026-02-01)**: Full rewrite. mcp-vector-search is a **subprocess** invoked via CLI, not an embedded Python library. All library-embedding references, cost estimates, latency projections, and the 4-phase timeline from v1.1 have been replaced with subprocess-verified data. Search is deferred -- users query through Claude Code's MCP interface, not a REST API we build.
 
-A critical architectural correction was made during design review:
+**v1.1 (2026-01-31)**: Corrected SemanticIndexer assumption. Reduced MVP timeline. Still assumed library embedding (wrong).
 
-- **Initial assumption**: Custom SemanticIndexer service would orchestrate indexing
-- **Correction**: mcp-vector-search provides complete indexing and search APIs
-- **Impact**:
-  - Removes ~200 lines of custom job queue code
-  - Reduces MVP timeline from 3-4 weeks to ~10-12 days
-  - Increases reliability (uses proven mcp-vector-search implementation)
-  - Simplifies architecture (thin wrappers, not orchestrators)
-
-All sections below reflect this corrected architecture.
+**v1.0 (2026-01-31)**: Original document. Assumed mcp-vector-search was an embeddable Python library (wrong).
 
 ---
 
-## Executive Summary
+## 1. Executive Summary
 
-**Research-Mind** is technically feasible as a session-sandbox system combining mcp-vector-search (indexing/search) with claude-mpm (agentic analysis). However, success requires significant work on sandbox containment and integration glue code.
+**Research-Mind** is technically feasible as a workspace-scoped indexing system combining mcp-vector-search (subprocess-based indexing) with claude-mpm (agentic analysis). The architecture is simpler than originally projected because mcp-vector-search handles all indexing internals -- we just spawn it and check the exit code.
 
 **Tell it like it is**:
 
-- ✓ Architecture is sound in principle
-- ✓ Both reference projects are production-capable
-- ✗ No "out of the box" solution exists
-- ✗ 6-8 weeks of engineering required for MVP
-- ✓ Cost reduction likely through caching + warm pools
-- ✗ Latency will be high initially (session startup 2-3s)
+- The architecture is sound and verified through testing
+- mcp-vector-search works reliably as a subprocess (exit codes, isolation, timing all confirmed)
+- There is no "out of the box" solution; we are building integration glue
+- Phase 1 is the only phase that exists right now (workspace registration + indexing)
+- Search is deferred to Claude Code's native MCP interface; we are not building a search API
+- Sandbox containment is still the hardest engineering problem
+- Cost and latency at scale are TBD -- we have small-project benchmarks only
 
-**Recommendation**: Build MVP with clear scoping, plan incremental improvements, invest in sandbox containment early.
+**Recommendation**: BUILD. Focus exclusively on Phase 1 (workspace registration + subprocess indexing service). Do not plan Phase 2-4 until Phase 1 is complete and real-world behavior is understood.
 
 ---
 
-## 1. What to Build First: MVP Scope
+## 2. Architecture Overview
 
-### 1.1 Minimal End-to-End Flow (Week 1-2)
+### 2.1 Subprocess-Based Design
+
+mcp-vector-search is a standalone CLI tool. research-mind-service spawns it as a subprocess, passing the workspace directory via `cwd`. There is no Python library import, no singleton, no embedded ChromaDB client.
 
 ```
-User: "Create research session on OAuth2 auth module"
-  │
-  └─→ Research-Mind Service:
-      ├─ Create session directory
-      ├─ Create .mcp-vector-search config
-      └─ Return session_id
-
-User: "Index the codebase"
-  │
-  └─→ Research-Mind Service:
-      ├─ Trigger mcp-vector-search indexing (async)
-      ├─ Poll job status
-      └─ Report completion
-
-User: "What does token refresh do?"
-  │
-  └─→ Research-Mind Service:
-      ├─ Vector search: "token refresh"
-      ├─ Pass results to claude-mpm agent
-      ├─ Agent synthesizes answer with code references
-      └─ Return findings with citations
+research-mind-service (FastAPI)
+  |
+  +-- Workspace Management API
+  |   +-- POST /workspaces/{id}/register
+  |   +-- POST /workspaces/{id}/index
+  |
+  +-- Indexing Operations (subprocess)
+      +-- subprocess.run(["mcp-vector-search", "init", "--force"], cwd=workspace_dir)
+      +-- subprocess.run(["mcp-vector-search", "index", "--force"], cwd=workspace_dir)
+          |
+          +-- workspace_dir/
+              +-- source code files
+              +-- .mcp-vector-search/       <-- index artifacts (auto-created)
+                  +-- config.json
+                  +-- chroma.sqlite3
+                  +-- index_metadata.json
+                  +-- directory_index.json
+                  +-- <UUID>/               <-- HNSW index files
 ```
 
-### 1.2 MVP Components
+### 2.2 Two-Step Indexing Flow
 
-**What's included**:
+Every workspace goes through the same sequence:
 
-1. FastAPI wrapper around mcp-vector-search ✓ (from REST API proposal)
-2. Basic session management ✓ (simple JSON storage)
-3. Path validator for claude-mpm ✓ (from containment plan)
-4. Minimal audit logging ✓ (basic file logging)
-5. Session-scoped collections in ChromaDB ✓ (param exists)
-6. Pre-built "research-analyst" agent (new)
+1. **Init**: `mcp-vector-search init --force` -- creates `.mcp-vector-search/` directory, downloads embedding model on first run (~250-500 MB, cached at `~/.cache/huggingface/hub/`)
+2. **Index**: `mcp-vector-search index --force` -- indexes all source files, stores embeddings in ChromaDB (SQLite-backed)
 
-**What's NOT included**:
+Both commands use exit code 0 for success, 1 for failure. That is the entire integration contract.
 
-- Auth/RBAC
-- Distributed job queuing
-- Advanced filtering
-- Rate limiting
-- WebSocket progress streams
-- Multi-region deployment
+### 2.3 Search Architecture (Deferred)
 
-### 1.3 MVP Implementation Plan
+Search is **not** part of Phase 1. Users query indexed workspaces through Claude Code's native MCP interface (`mcp__mcp-vector-search__search_code`, `search_context`, `search_similar`). research-mind-service does not expose a search endpoint.
 
-| Week      | Component         | Effort      | Dependencies              |
-| --------- | ----------------- | ----------- | ------------------------- |
-| **1**     | FastAPI wrapper   | 2 days      | mcp-vector-search library |
-| **1**     | Session CRUD      | 3 days      | Database (SQLite ok)      |
-| **1-2**   | Path validator    | 2 days      | -none-                    |
-| **2**     | Agent scaffolding | 3 days      | claude-mpm installation   |
-| **2**     | Integration tests | 4 days      | All above                 |
-| **2**     | Docs + deployment | 2 days      | All above                 |
-| **Total** |                   | ~10-12 days | -                         |
+This is a deliberate simplification. Building a REST search API on top of mcp-vector-search's MCP tools would add complexity without clear value -- Claude Code already knows how to use these tools natively. If a REST search API becomes necessary later, it can be added in a future phase.
 
----
+### 2.4 Index Storage
 
-## 2. What to Avoid (Anti-Patterns)
+All index artifacts live in `.mcp-vector-search/` at the workspace root. This directory is automatically added to `.gitignore` by the init command.
 
-### 2.1 DO NOT: Embed REST in mcp-vector-search
+| Artifact                  | Typical Size   | Purpose                                |
+| ------------------------- | -------------- | -------------------------------------- |
+| `config.json`             | <1 KB          | Embedding model settings               |
+| `chroma.sqlite3`          | ~410 KB        | Vector database (ChromaDB)             |
+| `index_metadata.json`     | <1 KB          | Index statistics                       |
+| `directory_index.json`    | <1 KB          | File tracking for incremental indexing |
+| `<UUID>/` (HNSW index)    | ~13 KB         | Binary similarity search index         |
+| **Total (small project)** | **432-552 KB** | Complete index for 2-file project      |
 
-**Why**:
+Estimated scaling (not yet tested):
 
-- Would require core modifications
-- Harder to version/upgrade
-- Mixing concerns (CLI tool vs. library)
+- Small project (1-50 files): 1-2 MB
+- Medium project (50-500 files): 10-50 MB
+- Large project (500-5000 files): 50-500 MB
 
-**DO**: Wrapper service importing mcp-vector-search as library ✓
-
-### 2.2 DO NOT: Rely on Prompts for Sandbox Isolation
-
-**Why**:
-
-- Prompt-based restrictions are not enforceable
-- Agent could be compromised/jailbroken
-- Serious security risk in multi-tenant scenario
-
-**DO**: Infrastructure-level path validation ✓
-
-### 2.3 DO NOT: Single Global ChromaDB Collection
-
-**Why**:
-
-- Sessions would contaminate each other
-- Search results from wrong sessions
-- Impossible to delete session data cleanly
-
-**DO**: Per-session collections (session\_{session_id}) ✓
-
-### 2.4 DO NOT: Build Custom Indexing When mcp-vector-search Provides It
-
-**Why**:
-
-- mcp-vector-search already has complete indexing APIs
-- Custom job queue code = unnecessary complexity and maintenance
-- Re-implementing proven functionality increases bugs
-- Better to use proven, tested implementation
-
-**DO**: Use mcp-vector-search's built-in async indexing APIs directly ✓
-
-Our wrapper becomes a thin adapter that:
-
-- Calls `mcp_vector_search.index()` for indexing
-- Calls `mcp_vector_search.search()` for searching
-- Manages session scoping (collection names, paths)
-- Provides job tracking via mcp-vector-search's job model
-- Logs and audits operations
-
-### 2.5 DO NOT: Trust Agent to Respect filesystem Restrictions
-
-**Why**:
-
-- Agents are powerful; can escape restrictions
-- No way to know what agent will do next
-
-**DO**: Validate every filesystem access at wrapper layer ✓
+Disk usage scales primarily with **file count**, not lines of code.
 
 ---
 
-## 3. Cost & Latency Reduction Strategies
+## 3. Component Analysis
 
-### 3.1 Cost Reduction
+### 3.1 mcp-vector-search (Subprocess Integration)
 
-**Indexing Costs**:
-| Strategy | Savings | Effort | Impact |
-|----------|---------|--------|--------|
-| Incremental indexing | 80% | Medium | Large |
-| Batch embeddings | 30% | Low | Medium |
-| Caching query results | 40% | Low | Medium |
-| Model quantization | 20% | High | Medium |
-| Total | ~70% | Medium | Large |
+**What it is**: A CLI tool that indexes source code into a ChromaDB vector database for semantic search. Installed via `pip install mcp-vector-search`. Provides both CLI commands and an MCP server for Claude Code integration.
 
-**Detailed strategies**:
+**How we use it**: Subprocess invocation only. We call `init` and `index` commands with `subprocess.run()`, setting `cwd` to the workspace directory. We check exit codes. We capture stdout/stderr for logging.
 
-1. **Incremental Indexing** (MVP +2 weeks)
+**What it handles for us**:
 
-   - Track file hashes
-   - Only reindex changed files
-   - Use git to detect changes
-   - Saves: 80% of compute for small changes
+- File discovery and language detection (TreeSitter-based)
+- Code chunking (functions, classes, comment blocks)
+- Embedding generation (sentence-transformers/all-MiniLM-L6-v2, 384-dim vectors)
+- ChromaDB storage and retrieval
+- Incremental indexing (change detection via file hashes and timestamps)
+- `.gitignore` awareness (auto-excludes .git, node_modules, **pycache**, etc.)
 
-2. **Batch Embeddings** (MVP baseline)
+**What we handle**:
 
-   - mcp-vector-search already batches
-   - Verify batch size tuning
-   - Saves: 30% network overhead
+- Workspace path validation (sandbox enforcement)
+- Subprocess lifecycle (timeouts, error handling, retry)
+- Indexing status tracking (is this workspace indexed? when? how long did it take?)
+- Concurrency control (don't index the same workspace twice simultaneously)
 
-3. **Query Caching** (MVP +1 week)
+**Verified characteristics** (from subprocess integration research):
 
-   - Cache search results per query
-   - TTL: 1 hour per session
-   - Saves: 40% of search requests
+| Property                    | Status    | Details                                           |
+| --------------------------- | --------- | ------------------------------------------------- |
+| Subprocess invocation       | Confirmed | `subprocess.run()` works correctly                |
+| Working directory detection | Confirmed | `cwd` parameter is sufficient, no flags needed    |
+| Exit code reliability       | Confirmed | 0 = success, 1 = failure                          |
+| Per-workspace isolation     | Confirmed | Parallel indexing of different workspaces is safe |
+| Same-workspace concurrency  | NOT SAFE  | ChromaDB SQLite single-writer limitation          |
+| Index self-containment      | Confirmed | Everything in `.mcp-vector-search/`               |
 
-4. **Warm Pools** (MVP +2 weeks)
-   - Keep Claude subprocess warm
-   - Reuse for multiple queries
-   - Saves: 2 seconds startup per query
+### 3.2 claude-mpm (Agent Orchestration)
 
-**Estimated savings**: 60-70% of indexing cost, 40-50% of search cost
+**What it is**: A multi-agent orchestration framework for Claude Code CLI. Provides session management, agent deployment (47+ agents), skills system, and MCP tool integration.
 
-### 3.2 Latency Reduction
+**Current status for research-mind**: Agent integration is deferred to Phase 2. The claude-mpm analysis from `claude-mpm-capabilities.md` remains valid. Key points:
 
-**Baseline latencies**:
+- **Session management**: UUID-based sessions with 30-day resumption window, persisted to disk
+- **Agent system**: 47+ deployed agents with customizable definitions (AGENT.md format)
+- **MCP integration**: Auto-discovers configured MCP servers, including mcp-vector-search
+- **Tool access**: Filesystem, git, execution, analysis, and MCP tools available to agents
+- **Sandbox gap**: Current implementation relies on prompt-based restrictions, NOT code-level enforcement. This is the primary security concern for research-mind.
 
-- Cold session start: 2-3 seconds
-- Warm session reuse: <100ms
-- Vector search: <100ms
-- Agent response: 5-10 seconds
-- **Total**: 7-13 seconds first query, 5-10 seconds subsequent
+**What we need to build** (Phase 2):
 
-**Optimization targets**:
+- Custom `research-analyst` agent definition
+- Infrastructure-level path validation wrapping all agent filesystem access
+- Audit logging for all tool calls
+- Token budgeting and cost tracking
 
-| Component       | Current | Target | Strategy           |
-| --------------- | ------- | ------ | ------------------ |
-| Session startup | 2-3s    | 0.1s   | Warm pools         |
-| Vector search   | <100ms  | <50ms  | Connection pooling |
-| Agent startup   | 2-3s    | 0.5s   | Session reuse      |
-| Agent response  | 5-10s   | 3-5s   | Token budgets      |
-| **Total**       | 7-13s   | 3-6s   | All above          |
+### 3.3 research-mind-service (FastAPI Wrapper)
 
-**MVP baseline**: 7-13 seconds (acceptable for first version)
-**With optimizations**: 3-6 seconds (production quality)
+**What it is**: The service we are building. A FastAPI application that orchestrates workspace registration, subprocess-based indexing, session management, and (eventually) agent invocation.
+
+**Phase 1 scope**:
+
+- Workspace CRUD (register, list, delete)
+- Workspace indexing via subprocess (init + index)
+- Path validation (sandbox enforcement)
+- Indexing status tracking
+- Audit logging for all operations
+- Health checks
+
+**What it is NOT** (in Phase 1):
+
+- Not a search API (search goes through Claude Code MCP)
+- Not an agent runner (agent integration is Phase 2)
+- Not a job queue (subprocess invocation is synchronous or simple async)
 
 ---
 
-## 4. MVP Slice: Smallest End-to-End Feature
+## 4. Security & Containment
 
-### 4.1 Single Research Query End-to-End
+The sandbox containment plan from `claude-mpm-sandbox-containment-plan.md` remains fully valid. The subprocess architecture actually strengthens isolation because each mcp-vector-search invocation is a separate OS process with its own filesystem scope.
+
+### 4.1 Defense-in-Depth Layers
 
 ```
-POST /api/sessions
-  ↓
-{
-  "session_id": "abc-123",
-  "workspace": "/var/lib/research-mind/sessions/abc-123"
-}
+Layer 1: FastAPI Middleware
+  - Validate session_id on every request
+  - Rate limiting per session
 
-POST /api/sessions/abc-123/add-content
-  body: {repository_path: "/path/to/app"}
-  ↓
-[Files copied to workspace]
+Layer 2: Service-Level Validation
+  - Path allowlist (workspace root enforcement)
+  - Symlink detection and resolution
+  - Disallowed patterns (.ssh, .env, /etc, /root)
 
-POST /api/sessions/abc-123/index
-  ↓
-[Calls mcp-vector-search.index() with collection=session_abc123]
-  ↓
-{
-  "job_id": "idx_456",
-  "status": "pending"
-}
+Layer 3: Subprocess Isolation
+  - cwd = workspace directory (filesystem boundary)
+  - Timeout per operation (prevent hanging)
+  - stdout/stderr capture (no interactive input)
+  - Exit code verification
 
-GET /api/sessions/abc-123/index/jobs/idx_456
-  ↓
-[Poll 5-10 times until "completed"]
-[Job tracking delegated to mcp-vector-search; FastAPI wrapper polls and returns status]
+Layer 4: Per-Workspace Index Isolation
+  - Each workspace has independent .mcp-vector-search/
+  - No shared ChromaDB instance
+  - Cross-workspace queries impossible by design
 
-POST /api/sessions/abc-123/search
-  body: {"query": "OAuth2 token refresh"}
-  ↓
-[Calls mcp-vector-search.search() with collection=session_abc123]
-  ↓
-{
-  "results": [
-    {
-      "file": "src/auth/oauth2.py",
-      "line": 42-67,
-      "code": "def refresh_token(...)...",
-      "relevance": 0.94
-    }
-  ]
-}
-
-POST /api/sessions/abc-123/analyze
-  body: {"question": "How does token refresh work?", "agent": "research-analyst"}
-  ↓
-{
-  "answer": "Token refresh works by...",
-  "evidence": [
-    {"source": "src/auth/oauth2.py:42-67", "code": "..."}
-  ]
-}
+Layer 5: Audit & Monitoring
+  - Log all subprocess invocations
+  - Log all filesystem access
+  - Alert on path validation failures
 ```
 
-### 4.2 What's NOT in MVP Slice
+### 4.2 Key Security Principles
 
-- Auth/login
-- Rate limiting
-- Advanced filtering
-- Multiple agents
-- WebSocket progress
-- Distributed queue
-- Cost estimation
+1. **Never trust the agent or prompt.** Enforce restrictions at the system level.
+2. **Validate every path** before passing it to any subprocess or filesystem operation.
+3. **Per-workspace isolation** is inherent in the subprocess design -- each workspace's index is physically separate.
+4. **Subprocess timeout** prevents runaway processes. Use 300-600s for production workspaces.
+5. **Audit everything.** Every subprocess invocation, every path validation, every error.
 
-### 4.3 MVP Success Criteria
+### 4.3 Subprocess-Specific Security
 
-- [ ] Can create session
-- [ ] Can index content (async job)
-- [ ] Can search indexed content
-- [ ] Can invoke agent with context
-- [ ] Can get answer with citations
-- [ ] Session isolation working
-- [ ] No data leaks between sessions
-- [ ] Basic audit logging
+The subprocess approach introduces these security considerations:
+
+- **Command injection**: We construct the subprocess command array programmatically (not via shell string). `subprocess.run(["mcp-vector-search", "init", "--force"], ...)` is safe. Never use `shell=True`.
+- **Path traversal**: The `cwd` parameter must be validated before use. A malicious workspace path could point anywhere on the filesystem.
+- **Resource exhaustion**: Large workspaces could consume significant CPU/memory during indexing. Timeout enforcement is mandatory.
+- **Concurrent indexing**: Two simultaneous index operations on the same workspace can corrupt the ChromaDB SQLite database. The service must enforce single-writer per workspace.
 
 ---
 
-## 5. Next Slice: Incremental Improvements
+## 5. Performance Characteristics
 
-### 5.1 Phase 2: Search Enhancements (Weeks 4-6)
+### 5.1 Measured Performance (Small Project)
 
-**Hybrid Retrieval**:
+From subprocess integration testing (2 Python files, 11 total lines):
 
-- Vector search + keyword (BM25) fallback
-- Re-rank results by relevance
-- Deduplication across similar results
-- Complexity: Medium (2 weeks)
-- Impact: 30% better search quality
+| Operation                      | Time       | Details                                            |
+| ------------------------------ | ---------- | -------------------------------------------------- |
+| Init (first run, model cached) | 3-5s       | Creates .mcp-vector-search/, runs initial indexing |
+| Index (force full)             | 3.89s      | Indexes all files, generates embeddings            |
+| Reindex (force full)           | 3.78s      | Comparable to initial index for small projects     |
+| Index size                     | 432-552 KB | Complete index artifacts                           |
+| Files indexed                  | 2          | With 4 searchable chunks                           |
 
-**Advanced Metadata Filtering**:
+**Key finding**: For very small projects, incremental indexing provides no meaningful advantage over full reindex. The overhead is in embedding model loading and ChromaDB initialization, not in file processing.
 
-- Filter by language, chunk_type, complexity
-- Range queries on line numbers
-- Hierarchical filtering (functions in class X)
-- Complexity: Medium (2 weeks)
-- Impact: 20% better precision
+### 5.2 Estimated Performance (Larger Projects)
 
-**Query Understanding**:
+These estimates are extrapolated, NOT tested:
 
-- Intent recognition (architectural vs. bug fix)
-- Multi-part queries
-- Implicit context from conversation history
-- Complexity: Medium (2 weeks)
-- Impact: 40% fewer irrelevant results
+| Project Size                | Estimated Index Time | Recommended Timeout |
+| --------------------------- | -------------------- | ------------------- |
+| <100 files, <10K LOC        | 10-15s               | 120s                |
+| 100-500 files, 10-50K LOC   | 30-60s               | 300s                |
+| 500-1000 files, 50-100K LOC | 60-180s              | 600s                |
+| 1000+ files, 100K+ LOC      | 120-300s             | 600s                |
 
-### 5.2 Phase 3: Reranking & Deduplication (Weeks 7-9)
+**Important**: These are rough estimates. Real-world performance will depend on file sizes, language distribution, embedding batch size, and system resources. Phase 1 should include benchmarking on representative real workspaces to replace these estimates.
 
-**Semantic Reranking**:
+### 5.3 First-Run Overhead
 
-- LLM-based relevance scoring (not just cosine similarity)
-- Consider code structure (public API vs. internal)
-- Boost recent code, penalize deprecated
-- Complexity: High (3 weeks)
-- Impact: 50% better precision
+The first time `mcp-vector-search init` runs on any machine, it downloads the sentence-transformers embedding model (~250-500 MB) from HuggingFace. This is cached at `~/.cache/huggingface/hub/` and reused for all subsequent workspaces.
 
-**Deduplication**:
+- First init on new machine: 3-15 minutes (network dependent)
+- Subsequent init on same machine: 3-5 seconds
 
-- Hash-based across sessions
-- Similarity-based (similar functions in different files)
-- Prevent duplicate search results
-- Complexity: Low (1 week)
-- Impact: Cleaner UX
+### 5.4 Parallel Indexing
 
-### 5.3 Phase 4: Operations & Scale (Weeks 10-12)
+Verified safe: Multiple workspaces can be indexed simultaneously from separate subprocess invocations. Testing showed two workspaces indexing in parallel completed in 10.81s total with no interference or cross-contamination.
 
-**TTL Pruning**:
-
-- Automatic cleanup of old sessions
-- Archive to long-term storage
-- Cost reduction
-- Complexity: Low (1 week)
-- Impact: 30% storage reduction
-
-**Multi-Instance Deployment**:
-
-- Horizontal scaling
-- Load balancing across instances
-- Shared ChromaDB cluster
-- Complexity: High (3 weeks)
-- Impact: 10x throughput
-
-### 5.4 Recommended Sequence
-
-1. **MVP** (Weeks 1-3): Core flow, isolation, logging
-2. **Phase 2** (Weeks 4-6): Hybrid search, filtering, quality
-3. **Phase 3** (Weeks 7-9): Reranking, deduplication, UX
-4. **Phase 4** (Weeks 10-12): Operations, scale, cost optimization
+Verified unsafe: Two simultaneous index operations on the same workspace. ChromaDB uses SQLite with single-writer locking. Concurrent writes to the same `chroma.sqlite3` will fail or corrupt the index.
 
 ---
 
-## 6. Risk Register (Top 8 Risks)
+## 6. Risk Register
 
-### Risk 1: Session Isolation Breach (CRITICAL)
+### Risk 1: Session/Workspace Isolation Breach (CRITICAL)
 
-**Risk**: Agents access files outside session directory despite validation.
+**Risk**: Agent or subprocess accesses files outside its designated workspace directory.
 
-**Likelihood**: Medium (agent intelligence unpredictable)
-**Impact**: CRITICAL (data exfiltration)
+**Likelihood**: Medium (if path validation is skipped or bypassed)
+**Impact**: CRITICAL (data exfiltration, cross-workspace contamination)
 **Mitigation**:
 
-- ✓ Multi-layer path validation (3 levels: middleware, service, subprocess)
-- ✓ Comprehensive audit logging
-- ✓ Regular security audits
-- ✓ Fuzzing tests for path traversal
-  **Residual Risk**: Low (with mitigations in place)
+- Multi-layer path validation (middleware, service, pre-subprocess)
+- Symlink detection
+- Comprehensive audit logging
+- Security test suite with 20+ attack patterns
+- Subprocess `cwd` enforcement
+
+**Residual Risk**: Low (with mitigations in place)
 
 ---
 
-### Risk 2: Vector Search Token Contamination (HIGH)
+### Risk 2: Same-Workspace Concurrent Indexing (HIGH)
 
-**Risk**: Multiple sessions' embeddings mixed in same collection.
+**Risk**: Two index operations run simultaneously on the same workspace, corrupting the ChromaDB SQLite database.
 
-**Likelihood**: Low (parameterized collection names)
-**Impact**: HIGH (search results from wrong session)
+**Likelihood**: Medium (if service does not enforce single-writer)
+**Impact**: HIGH (corrupted index, requires full re-init)
 **Mitigation**:
 
-- ✓ Per-session collection names enforced
-- ✓ Middleware validates session_id before search
-- ✓ Test suite for cross-session isolation
-  **Residual Risk**: Low
+- Service-level locking per workspace (mutex or database flag)
+- Check for existing `.mcp-vector-search/` lock files before indexing
+- Recovery procedure: delete `.mcp-vector-search/` and re-init
+
+**Residual Risk**: Low (with single-writer enforcement)
 
 ---
 
-### Risk 3: Agent Cost Explosion (HIGH)
+### Risk 3: Subprocess Timeout / Hang (MEDIUM)
 
-**Risk**: Agents use too many tokens, cost becomes prohibitive.
+**Risk**: mcp-vector-search subprocess hangs or takes excessively long on large workspaces.
 
-**Likelihood**: Medium (agents are verbose)
+**Likelihood**: Medium (large codebases, slow embedding generation)
+**Impact**: MEDIUM (blocked workspace, user frustration)
+**Mitigation**:
+
+- Configurable timeout per subprocess call (300-600s for production)
+- `subprocess.TimeoutExpired` handling with cleanup
+- Index status tracking (in-progress, completed, failed, timed-out)
+- Retry with increased timeout
+
+**Residual Risk**: Low
+
+---
+
+### Risk 4: Agent Cost Explosion (HIGH)
+
+**Risk**: When agent integration is added (Phase 2), agents consume excessive tokens.
+
+**Likelihood**: Medium (agents are verbose by nature)
 **Impact**: HIGH (budget overrun)
 **Mitigation**:
 
-- ✓ Token budgeting in SessionAgent
-- ✓ Automatic summarization at 70% threshold
-- ✓ Costs logged per session
-- ✓ Session-level cost caps
-  **Residual Risk**: Medium (needs monitoring)
+- Token budgeting in claude-mpm (auto-summarization at 70%, 85%, 95% thresholds)
+- Per-session cost caps
+- Cost logging per operation
+- Phase 2 concern -- not relevant until agent integration
+
+**Residual Risk**: Medium (requires monitoring in Phase 2)
 
 ---
 
-### Risk 4: Indexing Job Crashes (MEDIUM)
+### Risk 5: Embedding Model Availability (MEDIUM)
 
-**Risk**: Large repository indexing fails silently or times out.
+**Risk**: First-run model download fails (network timeout, disk space, HuggingFace outage).
 
-**Likelihood**: Medium (large codebases common)
-**Impact**: MEDIUM (session stuck, user frustrated)
+**Likelihood**: Low (model is well-cached, HuggingFace is reliable)
+**Impact**: MEDIUM (workspace init fails, all indexing blocked until resolved)
 **Mitigation**:
 
-- ✓ Timeout per indexing job (configurable)
-- ✓ Error handling with partial results
-- ✓ Incremental progress tracking
-- ✓ Checkpoint after each file
-- ✓ Resume capability
-  **Residual Risk**: Low
+- Pre-download model during deployment/setup (Phase 1.0)
+- Check for `~/.cache/huggingface/hub/` existence before first workspace init
+- Clear error message when model download fails
+- Minimum 1 GB free disk space check
+
+**Residual Risk**: Low
 
 ---
 
-### Risk 5: ChromaDB Corruption (MEDIUM)
+### Risk 6: Agent Jailbreak / Sandbox Escape (MEDIUM)
 
-**Risk**: Concurrent writes to shared ChromaDB cause index corruption.
+**Risk**: Agent ignores session scope instructions, attempts to access files outside workspace.
 
-**Likelihood**: Low (ChromaDB has locking)
-**Impact**: MEDIUM (index unusable)
-**Mitigation**:
-
-- ✓ Connection pooling with mutex
-- ✓ Stale lock cleanup on startup
-- ✓ Corruption detection in CollectionManager
-- ✓ Corruption recovery mechanism
-- ✓ Regular index validation
-  **Residual Risk**: Low
-
----
-
-### Risk 6: Agent Jailbreak (MEDIUM)
-
-**Risk**: Agent escapes instructions, ignores session scope.
-
-**Likelihood**: Low (LLM is generally compliant)
+**Likelihood**: Low (LLM generally compliant, but not guaranteed)
 **Impact**: MEDIUM (containment breach)
 **Mitigation**:
 
-- ✓ Infrastructure-level enforcement (not prompt-only)
-- ✓ Tool call interception
-- ✓ Command whitelisting
-- ✓ Network isolation
-- ✓ Extensive logging
-  **Residual Risk**: Low (mitigations are code-level)
+- Infrastructure-level enforcement (not prompt-only)
+- Path validation at every filesystem access point
+- Tool call interception and audit
+- Network isolation for subprocess
+- Phase 2 concern -- not relevant until agent integration
+
+**Residual Risk**: Low (with code-level enforcement)
 
 ---
 
-### Risk 7: Deployment Complexity (MEDIUM)
+### Risk 7: Scale Unknowns (MEDIUM)
 
-**Risk**: Multiple services (FastAPI, mcp-vector-search, claude-mpm) hard to deploy.
+**Risk**: Performance characteristics change significantly with real-world workspaces (hundreds of files, multiple languages, large files).
 
-**Likelihood**: Medium (many moving parts)
+**Likelihood**: High (we only have 2-file benchmarks)
+**Impact**: MEDIUM (may need architecture adjustments)
+**Mitigation**:
+
+- Phase 1 includes benchmarking on representative real workspaces
+- Timeout values are configurable, not hardcoded
+- Index size monitoring per workspace
+- Do not commit to Phase 2-4 timelines until Phase 1 data is available
+
+**Residual Risk**: Medium (inherent uncertainty)
+
+---
+
+### Risk 8: Deployment Complexity (MEDIUM)
+
+**Risk**: Multiple dependencies (FastAPI, mcp-vector-search, ChromaDB, sentence-transformers, HuggingFace model cache) make deployment fragile.
+
+**Likelihood**: Medium
 **Impact**: MEDIUM (operations burden)
 **Mitigation**:
 
-- ✓ Docker Compose for local dev
-- ✓ Kubernetes manifests for production
-- ✓ Health checks on all services
-- ✓ Automated scaling
-- ✓ Monitoring/alerting
-  **Residual Risk**: Medium (requires DevOps investment)
+- Docker multi-stage build with all dependencies
+- Health check endpoint that verifies mcp-vector-search CLI availability
+- Pre-baked model cache in Docker image
+- docker-compose for local development
+
+**Residual Risk**: Medium (requires DevOps investment)
 
 ---
 
-### Risk 8: Session Latency Too High (MEDIUM)
+## 7. Implementation Recommendation
 
-**Risk**: 7-13 second response times unacceptable to users.
+### 7.1 Phase 1: Workspace Registration & Indexing Service
 
-**Likelihood**: Medium (baseline is slow)
-**Impact**: MEDIUM (product unusable)
-**Mitigation**:
+This is the only phase we are committing to. It delivers:
 
-- ✓ Warm pools for agent reuse (2-3s → 0.1s)
-- ✓ Session caching (repeat queries <100ms)
-- ✓ Progressive UI (show results as they arrive)
-- ✓ Concurrent search + analysis
-- ✓ Query optimization (semantic reranking Phase 3)
-  **Residual Risk**: Medium initially, Low after Phase 2
+- FastAPI service with workspace CRUD
+- Subprocess-based indexing (init + index)
+- Path validation and sandbox enforcement
+- Audit logging
+- Integration tests with security coverage
 
----
+**Phase 1 subphases** (from IMPLEMENTATION_ROADMAP.md):
 
-## 7. Architecture Diagram
+| Subphase | Scope                                                        | Duration            | Dependencies |
+| -------- | ------------------------------------------------------------ | ------------------- | ------------ |
+| 1.0      | Environment setup, CLI installation, subprocess verification | 2-3 days            | None         |
+| 1.1      | FastAPI scaffold, WorkspaceIndexer class, config system      | 5-6 days            | 1.0          |
+| 1.2      | Session/workspace CRUD endpoints, database schema            | 3-4 days            | 1.1          |
+| 1.3      | Indexing operations (subprocess invocation, status tracking) | 5-6 days            | 1.1          |
+| 1.4      | Path validator (sandbox enforcement)                         | 2-3 days            | 1.1          |
+| 1.5      | Audit logging                                                | 2-3 days            | 1.2, 1.3     |
+| 1.6      | Agent integration                                            | DEFERRED to Phase 2 | --           |
+| 1.7      | Integration tests (>90% coverage, security suite)            | 5-7 days            | 1.2-1.5      |
+| 1.8      | Documentation and release                                    | 2 days              | 1.7          |
 
-```
-┌────────────────────────────────────────────────────────────┐
-│                    UI Layer (SvelteKit)                     │
-│          (research-mind-ui)                                 │
-├────────────────────────────────────────────────────────────┤
-│ - Session creation                                          │
-│ - Content upload                                            │
-│ - Search interface                                          │
-│ - Results display with citations                           │
-└──────────────────────┬─────────────────────────────────────┘
-                       │ REST API calls
-┌──────────────────────▼─────────────────────────────────────┐
-│          API Layer (FastAPI Service)                        │
-│      (research-mind-service)                                │
-├────────────────────────────────────────────────────────────┤
-│ - Session CRUD                                              │
-│ - Path validation (sandbox)                                 │
-│ - Audit logging                                             │
-└──────────┬──────────────────────┬────────────────────────┬──┘
-           │                      │                        │
-        [Search]             [Indexing]              [Analysis]
-           │                      │                        │
-┌──────────▼──────┐    ┌──────────▼──────┐    ┌───────────▼─────────┐
-│ Search Wrapper  │    │ Index Wrapper   │    │ Claude MPM Agent    │
-│ (thin adapter)  │    │ (thin adapter)  │    │ (subprocess)        │
-├─────────────────┤    ├─────────────────┤    ├─────────────────────┤
-│ mcp-vector-     │    │ mcp-vector-     │    │ research-analyst    │
-│ search library  │    │ search library  │    │ agent               │
-│ (search API)    │    │ (index API)     │    │                     │
-└──────────┬──────┘    └────────┬────────┘    └────────┬────────────┘
-           │                    │                      │
-           └────────┬───────────┴──────────────────────┘
-                    │
-        ┌───────────▼──────────────────┐
-        │  ChromaDB Vector Database    │
-        │  (managed by mcp-vector-     │
-        │   search, session collections)
-        │  - session_abc123            │
-        │  - session_def456            │
-        └───────────┬──────────────────┘
-                    │
-        ┌───────────▼──────────────────┐
-        │  Persistent Storage          │
-        ├──────────────────────────────┤
-        │ - Session DB (SQLite)        │
-        │ - Audit logs (SQLite)        │
-        │ - Session workspaces (disk)  │
-        │ - .mcp-vector-search/ dirs   │
-        │   (index metadata)           │
-        └──────────────────────────────┘
-```
+**Critical path**: 1.0 -> 1.1 -> 1.3 -> 1.5 -> 1.7 -> 1.8
+**Estimated duration**: 22-27 calendar days (3-4 weeks including Phase 1.0)
+**Team**: 2 FTE engineers
+
+### 7.2 What Phase 1 Does NOT Include
+
+- Search REST API (search goes through Claude Code MCP)
+- Agent integration (deferred to Phase 2)
+- Incremental indexing optimization (mcp-vector-search handles this internally)
+- Cost optimization / warm pools / query caching
+- Multi-region deployment
+- Auth/RBAC
+- Rate limiting (beyond basic timeout enforcement)
+
+### 7.3 Phase 1 Success Criteria
+
+- [ ] Can register a workspace (path validation, sandbox check)
+- [ ] Can index a workspace (subprocess init + index, status tracking)
+- [ ] Can list and delete workspaces (cleanup including .mcp-vector-search/)
+- [ ] Session/workspace isolation working (no cross-workspace access)
+- [ ] 100% path traversal blocking in security tests
+- [ ] > 90% test coverage
+- [ ] All subprocess error cases handled (timeout, permission, corruption)
+- [ ] Audit logging for all operations
+- [ ] Docker image builds and runs
+- [ ] docker-compose up works end-to-end
 
 ---
 
-## 8. Implementation Priorities
+## 8. Future Considerations
 
-### Must Have (MVP)
+These are potential future directions. None are committed. All depend on what we learn from Phase 1 in production.
 
-- [ ] Session management (CRUD)
-- [ ] Vector search REST API (wrapper around mcp-vector-search)
-- [ ] Indexing REST API (wrapper around mcp-vector-search)
-- [ ] Path validation (sandbox)
-- [ ] Agent invocation with context
-- [ ] Basic audit logging
+### Search API (Possible Phase 2)
 
-### Should Have (Phase 2)
+If Claude Code's native MCP search proves insufficient (e.g., we need REST access for the SvelteKit UI, or we need to combine search with agent context), we may build a search wrapper. This would likely be a thin FastAPI endpoint that invokes mcp-vector-search's MCP tools programmatically.
 
-- [ ] Incremental indexing
-- [ ] Query caching
-- [ ] Advanced filtering
-- [ ] Warm session pools
-- [ ] Multi-file context
+### Agent Integration (Planned Phase 2)
 
-### Nice to Have (Phase 3+)
+Custom `research-analyst` agent wrapping claude-mpm, with:
 
-- [ ] Hybrid search (keyword + vector)
-- [ ] Semantic reranking
-- [ ] Cost estimation
-- [ ] Auth/RBAC
-- [ ] Multi-region deployment
+- Infrastructure-level sandbox enforcement (not prompt-based)
+- Vector search context injection
+- Token budgeting and cost tracking
+- Audit trail for all agent actions
 
----
+### Optimization (Possible Phase 3+)
 
-## 9. Deployment Strategy
+- Warm session pools for agent reuse
+- Query caching
+- Semantic reranking
+- Result deduplication
+- Background/watch mode indexing
 
-### Local Development
+### Operations & Scale (Possible Phase 4+)
 
-```bash
-docker-compose up -d
+- TTL pruning for inactive workspaces
+- Multi-instance deployment (Kubernetes)
+- Distributed session state
+- Encrypted audit logs
+- Compliance reporting
 
-# Services started:
-# - FastAPI (8000)
-# - ChromaDB (implicit, in Python)
-# - Claude code (requires installed CLI)
-
-# Test MVP
-curl -X POST http://localhost:8000/api/sessions \
-  -d '{"name": "test"}'
-```
-
-### Single-Server Production
-
-```dockerfile
-# Dockerfile
-FROM python:3.11
-RUN pip install fastapi uvicorn mcp-vector-search
-COPY . /app
-WORKDIR /app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
-```
-
-```bash
-# Deploy
-docker build -t research-mind-service .
-docker run -d -p 8000:8000 \
-  -v /var/lib/research-mind:/var/lib/research-mind \
-  research-mind-service
-```
-
-### Kubernetes (Phase 4)
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: research-mind-service
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: research-mind-service
-  template:
-    metadata:
-      labels:
-        app: research-mind-service
-    spec:
-      containers:
-        - name: service
-          image: research-mind-service:latest
-          ports:
-            - containerPort: 8000
-          volumeMounts:
-            - name: sessions
-              mountPath: /var/lib/research-mind
-      volumes:
-        - name: sessions
-          persistentVolumeClaim:
-            claimName: research-mind-pvc
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: research-mind-pvc
-spec:
-  accessModes:
-    - ReadWriteMany
-  resources:
-    requests:
-      storage: 100Gi
-```
+**Timeline for these phases**: TBD. We will plan Phase 2 after Phase 1 is complete, deployed, and generating real usage data. Committing to Phase 2-4 timelines now would be speculative.
 
 ---
 
-## 10. Success Metrics
+## 9. Anti-Patterns to Avoid
 
-### MVP Success Criteria
+### DO NOT: Import mcp-vector-search as a Python Library
 
-| Metric            | Target         | How to Measure    |
-| ----------------- | -------------- | ----------------- |
-| Session creation  | <1s            | Log timestamps    |
-| Indexing speed    | >500 files/min | Job metrics       |
-| Search latency    | <100ms         | API metrics       |
-| Agent response    | <10s           | Session logs      |
-| Search precision  | >0.8           | Manual evaluation |
-| Session isolation | 100%           | Security audit    |
-| Uptime            | 99%+           | Monitoring system |
-| Cost per query    | <$0.10         | Token tracking    |
+It is not designed for this. The subprocess CLI is the supported integration surface. Attempting to import internal modules will break on upgrades and is not thread-safe.
 
-### Phase 2 Targets
+### DO NOT: Rely on Prompts for Sandbox Isolation
 
-- Search quality: 90% precision (hybrid + reranking)
-- Latency: <5s for agent analysis
-- Cost: $0.05 per query (40% reduction)
-- Throughput: 100 QPS (warm pools)
+Agent instructions like "only access files in the project directory" are not enforceable. Agents can and do ignore prompt constraints. All filesystem restrictions must be enforced at the code level.
 
----
+### DO NOT: Index Same Workspace Concurrently
 
-## 11. Open Questions & Unknowns
+ChromaDB uses SQLite with single-writer locking. Two simultaneous index operations on the same workspace will corrupt the database. The service must enforce mutual exclusion per workspace.
 
-1. **ChromaDB concurrent write safety**: How safe is concurrent write to same collection from multiple indexing jobs?
+### DO NOT: Build What mcp-vector-search Already Provides
 
-   - **Answer needed before Phase 2**
+mcp-vector-search handles file discovery, chunking, embedding, storage, incremental indexing, and search. Our service is a thin orchestration layer -- not a reimplementation of indexing logic.
 
-2. **Agent consistency**: Does claude-mpm guarantee deterministic responses given same input?
+### DO NOT: Plan Phases 2-4 in Detail
 
-   - **Impact**: Caching strategy
+We have small-project benchmarks and untested scale estimates. Planning detailed timelines for optimization, reranking, and multi-region deployment before Phase 1 is complete is premature. Ship Phase 1, learn from it, then plan the next increment.
 
-3. **Token usage patterns**: How predictable are agent token costs?
+### DO NOT: Use shell=True in subprocess calls
 
-   - **Impact**: Cost modeling
-
-4. **Embedding model performance**: Does all-MiniLM-L6-v2 perform well for code semantics?
-
-   - **Mitigation**: Support pluggable models (Phase 2)
-
-5. **Session resumption reliability**: What percentage of sessions fail to resume?
-   - **Impact**: Session management strategy
+Always pass commands as a list to `subprocess.run()`. Never construct shell command strings. This prevents command injection vulnerabilities.
 
 ---
 
-## 12. Final Recommendation
+## 10. Key Documents
 
-### Decision: Build Research-Mind as Specified
+### Architecture & Integration
 
-**Rationale**:
+- `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` -- Definitive subprocess integration guide (v2.0)
+- `docs/research2/RESEARCH_SUMMARY.md` -- Quick summary of subprocess research findings
+- `docs/research2/mcp-vector-search-subprocess-integration-research.md` -- Full research with test results (1,500+ lines)
 
-1. Architecture is technically sound ✓
-2. Both reference projects are production-ready ✓
-3. Sandbox containment is achievable with proper engineering ✓
-4. Cost reduction strategies are straightforward ✓
-5. Latency is initially high but acceptable (7-13s) ✓
+### Component Analysis
 
-### Go/No-Go Decision: GO
+- `docs/research/claude-mpm-capabilities.md` -- Claude MPM capabilities and architecture (still valid)
+- `docs/research/claude-mpm-sandbox-containment-plan.md` -- Security architecture (still valid)
+- `docs/research/mcp-vector-search-capabilities.md` -- mcp-vector-search technical deep dive
 
-**Conditions**:
+### Implementation Planning
 
-- [ ] Team commits to sandbox containment as non-negotiable
-- [ ] Path validation implemented before any agent access
-- [ ] Comprehensive audit logging from day 1
-- [ ] Security review before Phase 2 (when accessing real data)
+- `docs/plans/IMPLEMENTATION_ROADMAP.md` -- Master timeline and phase details
 
-### Timeline: 12 Weeks to Production
+### Deprecated / Removed
 
-| Phase       | Duration    | Deliverable                         |
-| ----------- | ----------- | ----------------------------------- |
-| **MVP**     | Weeks 1-3   | Core research loop working          |
-| **Phase 2** | Weeks 4-6   | 90% search quality, $0.05 per query |
-| **Phase 3** | Weeks 7-9   | Reranking, deduplication, UX polish |
-| **Phase 4** | Weeks 10-12 | Multi-instance, scaling, ops ready  |
-
-### Resource Requirements
-
-- Backend: 1 Senior + 1 Junior Python engineer (full-time)
-- DevOps: 0.5 engineer (part-time, Phase 3+)
-- QA: 0.5 engineer (part-time, comprehensive security testing)
-- PM: 0.5 (coordination, requirements refinement)
-- **Total**: ~2-2.5 FTE for 12 weeks
+- ~~`docs/research/mcp-vector-search-rest-api-proposal.md`~~ (deleted - library-based approach was abandoned)
+- ~~`docs/plans/IMPLEMENTATION_PLAN.md`~~ (deleted - replaced by IMPLEMENTATION_ROADMAP.md)
 
 ---
 
-## References
-
-### Key Documents
-
-- `mcp-vector-search-capabilities.md` - Technical deep dive
-- `mcp-vector-search-rest-api-proposal.md` - API design
-- `claude-mpm-capabilities.md` - Agent runtime details
-- `claude-mpm-sandbox-containment-plan.md` - Security architecture
-
-### Code Structure
-
-```
-research-mind/
-├── research-mind-service/
-│   ├── app/
-│   │   ├── main.py                 # FastAPI app
-│   │   ├── routes/
-│   │   │   ├── sessions.py         # Session CRUD
-│   │   │   ├── index.py            # Indexing endpoints
-│   │   │   ├── search.py           # Search endpoints
-│   │   │   └── analyze.py          # Analysis endpoints
-│   │   ├── services/
-│   │   │   ├── session_manager.py
-│   │   │   ├── indexer.py
-│   │   │   ├── search_client.py
-│   │   │   └── agent_runner.py
-│   │   ├── sandbox/
-│   │   │   ├── path_validator.py
-│   │   │   ├── session_validator.py
-│   │   │   ├── network_isolation.py
-│   │   │   └── tool_interceptor.py
-│   │   └── models/
-│   │       └── audit_log.py
-│   ├── tests/
-│   │   ├── test_sandbox_containment.py
-│   │   ├── test_isolation.py
-│   │   └── test_integration.py
-│   └── Dockerfile
-├── research-mind-ui/
-│   ├── src/
-│   │   ├── lib/
-│   │   │   └── api.ts             # Calls to service
-│   │   ├── routes/
-│   │   │   ├── +page.svelte       # Home
-│   │   │   ├── sessions/          # Session UI
-│   │   │   └── research/          # Research UI
-│   │   └── components/
-│   └── Dockerfile
-├── docs/
-│   ├── research/
-│   │   ├── mcp-vector-search-capabilities.md ✓
-│   │   ├── mcp-vector-search-rest-api-proposal.md ✓
-│   │   ├── claude-mpm-capabilities.md ✓
-│   │   ├── claude-mpm-sandbox-containment-plan.md ✓
-│   │   └── combined-architecture-recommendations.md ✓
-│   └── api-contract.md
-└── docker-compose.yml
-```
-
----
-
-**Status**: Ready for implementation ✓
+**Status**: Ready for Phase 1 implementation.
+**Decision**: BUILD -- subprocess-based architecture, Phase 1 only, learn before committing to more.

@@ -10,14 +10,14 @@
 > **ARCHITECTURE NOTE (v2.0)**: This document reflects the subprocess-based architecture.
 > mcp-vector-search runs as a CLI subprocess, NOT as an embedded Python library.
 > Phase 1 delivers workspace registration and indexing. Search and agent analysis
-> are deferred to Phase 2.
+> are deferred to a future phase.
 > See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) for details.
 
 ---
 
 ## Phase Objective
 
-Build a workspace registration and indexing service: create session, register workspace, index content via mcp-vector-search subprocess. This MVP establishes the foundation for Phase 2 search and analysis.
+Build a workspace registration and indexing service: create session, register workspace, index content via mcp-vector-search subprocess. This MVP establishes the foundation for future search and analysis.
 
 **Success Definition**: By end of Phase 1, users can:
 
@@ -27,7 +27,7 @@ Build a workspace registration and indexing service: create session, register wo
 4. Verify indexing status (check .mcp-vector-search/ directory)
 5. Delete sessions with full cleanup (including index artifacts)
 
-**Deferred to Phase 2**:
+**Deferred to future phase**:
 
 - Search indexed content (via Claude Code MCP interface)
 - Agent analysis with citations
@@ -60,19 +60,19 @@ See **00-PHASE_1_0_ENVIRONMENT_SETUP.md** for complete details.
 
 ### Phase 1 Subphases: 8 Sequential/Parallel Tasks (10-14 days)
 
-| Subphase                          | Duration       | Effort      | Blocking                            | FTE           | Critical?               |
-| --------------------------------- | -------------- | ----------- | ----------------------------------- | ------------- | ----------------------- |
-| **1.1: Service Architecture**     | 5-6 days       | 40-48h      | 1.2, 1.3, 1.4, 1.5, 1.7, 1.8        | 2 FTE         | CRITICAL                |
-| **1.2: Session Management**       | 3-4 days       | 24-32h      | 1.5, 1.7, 1.8 (can start after 1.1) | 1-2 FTE       | CRITICAL                |
-| **1.3: Indexing Operations**      | 3-4 days       | 24-32h      | 1.7, 1.8 (can start after 1.1)      | 1-2 FTE       | CRITICAL                |
-| **1.4: Path Validator (Sandbox)** | 2-3 days       | 16-24h      | 1.7 (can start after 1.1)           | 1 FTE         | CRITICAL                |
-| **1.5: Minimal Audit Logging**    | 2-3 days       | 16-24h      | 1.7 (can start after 1.2)           | 1 FTE         | Important               |
-| **1.6: Agent Integration**        | ---            | ---         | ---                                 | ---           | **DEFERRED TO PHASE 2** |
-| **1.7: Integration Tests**        | 4-5 days       | 32-40h      | 1.8 (can start after 1.5)           | 1-2 FTE       | CRITICAL                |
-| **1.8: Documentation & Release**  | 2 days         | 16h         | None (final phase)                  | 1 FTE         | Important               |
-| **TOTAL**                         | **10-14 days** | **80-110h** | ---                                 | **2 FTE avg** | ---                     |
+| Subphase                          | Duration       | Effort      | Blocking                            | FTE           | Critical?                    |
+| --------------------------------- | -------------- | ----------- | ----------------------------------- | ------------- | ---------------------------- |
+| **1.1: Service Architecture**     | 5-6 days       | 40-48h      | 1.2, 1.3, 1.4, 1.5, 1.7, 1.8        | 2 FTE         | CRITICAL                     |
+| **1.2: Session Management**       | 3-4 days       | 24-32h      | 1.5, 1.7, 1.8 (can start after 1.1) | 1-2 FTE       | CRITICAL                     |
+| **1.3: Indexing Operations**      | 3-4 days       | 24-32h      | 1.7, 1.8 (can start after 1.1)      | 1-2 FTE       | CRITICAL                     |
+| **1.4: Path Validator (Sandbox)** | 2-3 days       | 16-24h      | 1.7 (can start after 1.1)           | 1 FTE         | CRITICAL                     |
+| **1.5: Minimal Audit Logging**    | 2-3 days       | 16-24h      | 1.7 (can start after 1.2)           | 1 FTE         | Important                    |
+| **1.6: Agent Integration**        | ---            | ---         | ---                                 | ---           | **DEFERRED TO FUTURE PHASE** |
+| **1.7: Integration Tests**        | 4-5 days       | 32-40h      | 1.8 (can start after 1.5)           | 1-2 FTE       | CRITICAL                     |
+| **1.8: Documentation & Release**  | 2 days         | 16h         | None (final phase)                  | 1 FTE         | Important                    |
+| **TOTAL**                         | **10-14 days** | **80-110h** | ---                                 | **2 FTE avg** | ---                          |
 
-**Note**: Phase 1.6 (Agent Integration) is DEFERRED to Phase 2. Search functionality
+**Note**: Phase 1.6 (Agent Integration) is DEFERRED to future phase. Search functionality
 is required for agent integration, and search will use Claude Code's MCP interface
 (not a REST wrapper). This reduces Phase 1 scope and timeline.
 
@@ -109,7 +109,7 @@ Week 2: Days 6-10
   |   |-- Audit log model
   |   +-- Logging operations (including subprocess invocations)
   |
-  +-- [1.6: Agent Integration - DEFERRED TO PHASE 2]
+  +-- [1.6: Agent Integration - DEFERRED TO FUTURE PHASE]
 
 Week 3: Days 11-14
   |-- 1.7: Integration Tests (4-5 days) - CRITICAL PATH END
@@ -225,7 +225,7 @@ Total Critical Path: Phase 1.0 (2-3 days) + 1.1 (5-6 days) + 1.7 (4-5 days) = 11
 - Two-step subprocess flow: init + index
 - Index status checking via .mcp-vector-search/ directory existence
 - Error handling for subprocess exit codes and timeouts
-- Search functionality DEFERRED to Phase 2 (Claude Code MCP interface)
+- Search functionality DEFERRED to future phase (Claude Code MCP interface)
 
 **Deliverables**:
 
@@ -305,12 +305,12 @@ Total Critical Path: Phase 1.0 (2-3 days) + 1.1 (5-6 days) + 1.7 (4-5 days) = 11
 
 ---
 
-### Phase 1.6: Agent Integration - DEFERRED TO PHASE 2
+### Phase 1.6: Agent Integration - DEFERRED TO FUTURE PHASE
 
 **See**: **01_1_6-AGENT_INTEGRATION.md** for deferral details
 
 **Status**: DEFERRED - Agent integration depends on search functionality, which
-will use Claude Code's MCP interface in Phase 2. Not a Phase 1 deliverable.
+will use Claude Code's MCP interface in a future phase. Not a Phase 1 deliverable.
 
 ---
 
@@ -399,7 +399,7 @@ Phase 1.1: Service Architecture (FastAPI + WorkspaceIndexer subprocess manager)
     |---> Phase 1.5: Audit Logging
     |     | BLOCKS: 1.7, 1.8
     |
-    |     [Phase 1.6: Agent Integration - DEFERRED TO PHASE 2]
+    |     [Phase 1.6: Agent Integration - DEFERRED TO FUTURE PHASE]
     |
     |---> Phase 1.7: Integration Tests
     |     | BLOCKS: 1.8
@@ -433,12 +433,6 @@ Phase 1.1: Service Architecture (FastAPI + WorkspaceIndexer subprocess manager)
   - Quick reference of verified subprocess behavior
   - Test results for all integration patterns
 
-- **docs/research/mcp-vector-search-rest-api-proposal.md** (1,015 lines)
-
-  - Section 2: REST API Specification
-  - Section 2.1: Session Management Endpoints
-  - Provides API contracts for Phase 1.2
-
 - **docs/research/claude-ppm-sandbox-containment-plan.md** (918 lines)
 
   - Section 2.1: Path Validator Design & Implementation
@@ -455,16 +449,16 @@ Phase 1.1: Service Architecture (FastAPI + WorkspaceIndexer subprocess manager)
 - **docs/research/mcp-vector-search-capabilities.md** - Tool architecture context
 - **docs/research/mcp-vector-search-packaging-installation.md** - Docker setup for Phase 1.8
 
-### Original Plan References
+### Other References
 
-- **IMPLEMENTATION_PLAN.md** - Master reference for Phase 1
+- **IMPLEMENTATION_ROADMAP.md** - Master roadmap for Phase 1
 - **IMPLEMENTATION_PLAN_ANALYSIS.md** - Gap analysis and Phase 1 assessment
 
 ---
 
 ## Acceptance Criteria (Phase 1 Complete)
 
-All acceptance criteria must be met before Phase 2 begins:
+All acceptance criteria must be met before the next phase begins:
 
 ### MVP Functionality (MUST COMPLETE)
 
@@ -503,7 +497,7 @@ All acceptance criteria must be met before Phase 2 begins:
 - [ ] Tech lead reviews all code and architecture
 - [ ] Security lead reviews path validator and isolation mechanisms
 - [ ] QA lead verifies test coverage >90%
-- [ ] Engineering team consensus: ready for Phase 2
+- [ ] Engineering team consensus: ready for next phase
 
 ---
 
@@ -585,7 +579,7 @@ All acceptance criteria must be met before Phase 2 begins:
 
 **Decision**:
 
-- **GO**: MVP released, can begin Phase 2 (search + agent integration)
+- **GO**: MVP released, can begin future phases (search + agent integration)
 - **NO-GO**: Documentation gaps or unresolved issues
 
 **Owner**: Product lead
@@ -681,7 +675,7 @@ All acceptance criteria must be met before Phase 2 begins:
 
 ### Risk Category 5: Prompt-Based Sandbox Failure
 
-**Risk**: Future agent (Phase 2) escapes sandbox constraints
+**Risk**: Future agent escapes sandbox constraints
 
 **Probability**: Low (infrastructure-level enforcement)
 
@@ -728,7 +722,7 @@ All acceptance criteria must be met before Phase 2 begins:
 
 - **Code Quality**: Clean architecture, well-documented, follows patterns
 - **User Experience**: Endpoints intuitive, error messages clear
-- **Team Confidence**: >80% consensus ready for Phase 2
+- **Team Confidence**: >80% consensus ready for next phase
 - **Documentation**: Complete README, examples, troubleshooting
 
 ---
@@ -743,24 +737,18 @@ All acceptance criteria must be met before Phase 2 begins:
 4. **Security Foundation** - Path validator, audit logging
 5. **Testing & Verification** - >90% coverage, security audit ready
 
-**Deferred to Phase 2**:
+**Deferred to future phase**:
 
 - Search functionality (via Claude Code MCP interface)
 - Agent integration and analysis
 - Incremental re-indexing
 
-**Upon Phase 1 completion**, the system is ready for:
-
-- Phase 2: Search + Agent Integration (via Claude Code MCP)
-- Phase 3: Polish (UX, reranking)
-- Phase 4: Scale (production hardening)
-
-**Phase 1 is the critical foundation** that all subsequent phases build upon.
+**Phase 1 is the critical foundation** that all subsequent phases build upon. Future phases for cost optimization, search quality, reranking, and operational scaling will be planned after Phase 1 implementation is complete and real-world behavior is understood.
 
 ---
 
-**Document Version**: 2.0
+**Document Version**: 2.1
 **Last Updated**: 2026-02-01
 **Architecture**: Subprocess-based (replaces v1.0 library embedding approach)
-**Next Phase**: Phase 2: Search + Agent Integration (via Claude Code MCP)
+**Next Phase**: To be planned after Phase 1 completion
 **Related Documents**: 01_1_1 through 01_1_8 (subphase details)

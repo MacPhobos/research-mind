@@ -1,147 +1,79 @@
 # Research-Mind Implementation Roadmap
 
-**Master Index & Timeline for Complete 12-Week Project**
-**Last Updated**: 2026-01-31
+**Master Index & Timeline for Phase 1 MVP**
+**Last Updated**: 2026-02-01
 **Status**: READY FOR EXECUTION
 
 ---
 
 ## Executive Summary
 
-This roadmap outlines the complete 12-week path from MVP to production for research-mind, a session-scoped agentic research system combining semantic code indexing (mcp-vector-search, subprocess-based) with Claude agent analysis (claude-ppm).
+This roadmap outlines Phase 1 (MVP) for research-mind, a session-scoped agentic research system combining semantic code indexing (mcp-vector-search, subprocess-based) with Claude agent analysis (claude-ppm).
 
 **Architecture Note**: mcp-vector-search is integrated as a **subprocess** spawned by research-mind-service, NOT as an embedded Python library. See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) for the definitive integration approach.
 
 **Key Metrics**:
 
-- **Timeline**: 12 weeks to production (includes 2-3 day Phase 1.0 pre-phase)
-- **MVP**: 15-21 calendar days (Phase 1.0 + Phase 1 subphases)
-- **Team**: 2-2.5 FTE engineers average
-- **Cost Reduction**: 60-70% vs. baseline through caching and warm pools
-- **Search Quality**: 95%+ precision by Phase 3
-- **Availability**: 99%+ uptime by Phase 4
+- **MVP Timeline**: 22-27 calendar days (Phase 1.0 + Phase 1 subphases)
+- **Team**: 2 FTE engineers
+- **Test Coverage**: >90%
+- **Session Isolation**: 100%
+- **Path Traversal Blocked**: 100%
 
 ---
 
-## Master Timeline
+## Phase 1 Timeline
 
 ```
 Week 0 (Pre-Week 1): Phase 1.0 Environment Setup (2-3 days)
-│
-├─ Day -3 to -1: Dependency installation, baseline documentation
-│   └─ Gate 1 Review: Phase 1.0 complete, team consensus to proceed
-│
+|
++-- Day -3 to -1: Dependency installation, baseline documentation
+|   +-- Gate 1 Review: Phase 1.0 complete, team consensus to proceed
+|
 Week 1-3: Phase 1 Foundation (MVP Core Research Loop) - 12-16 days
-│
-├─ Days 1-6: Phase 1.1 Service Architecture (5-6 days, BLOCKING)
-│   ├─ FastAPI scaffold
-│   ├─ WorkspaceIndexer subprocess manager
-│   ├─ Configuration system
-│   └─ Docker multi-stage build
-│
-├─ Parallel (Days 6-10): Phase 1.2, 1.3, 1.4
-│   ├─ Phase 1.2: Session Management (3-4 days)
-│   │   ├─ CRUD endpoints
-│   │   ├─ Database schema
-│   │   └─ Workspace initialization
-│   │
-│   ├─ Phase 1.3: Indexing Operations (5-6 days)
-│   │   ├─ Subprocess invocation (init + index)
-│   │   ├─ Indexing endpoints
-│   │   └─ Search deferred to Phase 2
-│   │
-│   └─ Phase 1.4: Path Validator (2-3 days)
-│       ├─ Path validation logic
-│       └─ Middleware integration
-│
-├─ Days 10-13: Phase 1.5, 1.6 (can parallel)
-│   ├─ Phase 1.5: Audit Logging (2-3 days)
-│   │   ├─ AuditLog model
-│   │   └─ Logging integration
-│   │
-│   └─ Phase 1.6: Agent Integration (DEFERRED to Phase 2)
-│       ├─ Depends on search functionality (Phase 2)
-│       ├─ Depends on Claude Code MCP integration
-│       └─ Placeholder only in Phase 1
-│
-├─ Days 13-20: Phase 1.7, 1.8 (sequential)
-│   ├─ Phase 1.7: Integration Tests (5-7 days)
-│   │   ├─ End-to-end tests
-│   │   ├─ Isolation tests
-│   │   ├─ Security tests
-│   │   └─ Gate 3 Review: >90% coverage, security passed
-│   │
-│   └─ Phase 1.8: Documentation & Release (2 days)
-│       ├─ README and docs
-│       ├─ Docker Compose setup
-│       └─ Gate 4 Review: MVP ready for release
-│
-Weeks 4-6: Phase 2 Cost & Quality Optimization (3 weeks, 60-72 hours)
-│
-├─ Week 4:
-│   ├─ 2.1: Incremental Indexing (1 week)
-│   │   └─ 80% cost savings for small changes
-│   │
-│   └─ 2.2: Query Caching (3-4 days)
-│       └─ 40% hit rate on typical usage
-│
-├─ Week 5:
-│   ├─ 2.3: Advanced Filtering (3-4 days)
-│   │   └─ Language, type, complexity filters
-│   │
-│   └─ 2.4: Warm Session Pools (1 week)
-│       └─ 90% latency reduction for follow-ups
-│
-├─ Week 6:
-│   └─ 2.5: Cost Optimization (ongoing)
-│       ├─ Token budgets
-│       ├─ Auto-summarization
-│       └─ Cost monitoring
-│           └─ Gate: 40-50% cost reduction achieved
-│
-Weeks 7-9: Phase 3 Reranking & UX Polish (3 weeks, 60-72 hours)
-│
-├─ Week 7:
-│   └─ 3.1: Semantic Reranking (1 week)
-│       └─ 95%+ precision achieved
-│
-├─ Week 8:
-│   ├─ 3.2: Result Deduplication (3-4 days)
-│   │   └─ Remove 30%+ redundant results
-│   │
-│   └─ 3.3: Advanced Agent Features (3-4 days)
-│       ├─ Multi-turn conversations
-│       └─ Citation export
-│
-└─ Week 9: Polish & Testing
-    └─ Gate: 95%+ precision, production UX ready
-
-Weeks 10-12: Phase 4 Operations & Scale (3 weeks, 60-72 hours)
-│
-├─ Week 10:
-│   └─ 4.1: TTL Pruning & Cleanup (3-4 days)
-│       └─ Auto-delete expired sessions, archive logs
-│
-├─ Week 11:
-│   ├─ 4.2: Multi-Instance Deployment (1 week)
-│   │   ├─ Kubernetes manifests
-│   │   ├─ 3+ replicas
-│   │   └─ 10x throughput capability
-│   │
-│   └─ 4.3: Production Hardening (partial)
-│       ├─ Rate limiting
-│       └─ Distributed session state
-│
-├─ Week 12:
-│   └─ 4.3 (continued): Production Hardening
-│       ├─ Encrypted audit logs
-│       ├─ Compliance reporting
-│       ├─ Security audit
-│       └─ Gate: 99%+ uptime, 10x throughput, security audit passed
-
-Week 13+: Operations & Continuous Improvement
-│
-└─ Monitoring, alerting, optimization based on production metrics
+|
++-- Days 1-6: Phase 1.1 Service Architecture (5-6 days, BLOCKING)
+|   +-- FastAPI scaffold
+|   +-- WorkspaceIndexer subprocess manager
+|   +-- Configuration system
+|   +-- Docker multi-stage build
+|
++-- Parallel (Days 6-10): Phase 1.2, 1.3, 1.4
+|   +-- Phase 1.2: Session Management (3-4 days)
+|   |   +-- CRUD endpoints
+|   |   +-- Database schema
+|   |   +-- Workspace initialization
+|   |
+|   +-- Phase 1.3: Indexing Operations (5-6 days)
+|   |   +-- Subprocess invocation (init + index)
+|   |   +-- Indexing endpoints
+|   |   +-- Search deferred to future phase
+|   |
+|   +-- Phase 1.4: Path Validator (2-3 days)
+|       +-- Path validation logic
+|       +-- Middleware integration
+|
++-- Days 10-13: Phase 1.5 (Phase 1.6 deferred)
+|   +-- Phase 1.5: Audit Logging (2-3 days)
+|   |   +-- AuditLog model
+|   |   +-- Logging integration
+|   |
+|   +-- Phase 1.6: Agent Integration (DEFERRED to future phase)
+|       +-- Depends on search functionality
+|       +-- Depends on Claude Code MCP integration
+|       +-- Placeholder only in Phase 1
+|
++-- Days 13-20: Phase 1.7, 1.8 (sequential)
+    +-- Phase 1.7: Integration Tests (5-7 days)
+    |   +-- End-to-end tests
+    |   +-- Isolation tests
+    |   +-- Security tests
+    |   +-- Gate 3 Review: >90% coverage, security passed
+    |
+    +-- Phase 1.8: Documentation & Release (2 days)
+        +-- README and docs
+        +-- Docker Compose setup
+        +-- Gate 4 Review: MVP ready for release
 ```
 
 ---
@@ -150,14 +82,14 @@ Week 13+: Operations & Continuous Improvement
 
 ### Core Planning Documents
 
-1. **00-PHASE_1_0_ENVIRONMENT_SETUP.md** (70 KB, 2,000+ lines)
+1. **00-PHASE_1_0_ENVIRONMENT_SETUP.md**
 
    - Pre-phase setup for mcp-vector-search CLI installation
    - 8 detailed tasks with hour estimates
    - Critical for de-risking Phase 1.1
    - Reference: MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md (v2.0, subprocess-based)
 
-2. **01-PHASE_1_FOUNDATION.md** (50 KB, 1,500+ lines)
+2. **01-PHASE_1_FOUNDATION.md**
    - Phase 1 overview with critical path analysis
    - Covers all 8 subphases (1.1-1.8)
    - Dependency graph and parallelization opportunities
@@ -165,124 +97,81 @@ Week 13+: Operations & Continuous Improvement
 
 ### Phase 1 Subphase Details (1.1-1.8)
 
-3. **01_1_1-SERVICE_ARCHITECTURE.md** (35 KB, 1,000+ lines)
+3. **01_1_1-SERVICE_ARCHITECTURE.md**
 
    - FastAPI scaffold with WorkspaceIndexer subprocess manager
    - Reference: MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md (v2.0, subprocess-based)
    - 6 detailed tasks with code templates
 
-4. **01_1_2-SESSION_MANAGEMENT.md** (30 KB, 900+ lines)
+4. **01_1_2-SESSION_MANAGEMENT.md**
 
    - Session CRUD endpoints with database persistence
-   - Reference: mcp-vector-search-rest-api-proposal.md Section 2.1
    - 7 detailed tasks covering model, schema, routes, service
 
-5. **01_1_3-INDEXING_OPERATIONS.md** (35 KB, 1,000+ lines)
+5. **01_1_3-INDEXING_OPERATIONS.md**
 
    - Subprocess-based workspace indexing operations
    - Reference: MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md (v2.0, subprocess-based)
-   - Per-workspace indexing via subprocess, search deferred to Phase 2
+   - Per-workspace indexing via subprocess, search deferred to future phase
 
-6. **01_1_4-PATH_VALIDATOR.md** (20 KB, 600+ lines)
+6. **01_1_4-PATH_VALIDATOR.md**
 
    - Infrastructure-level path validation for sandbox
    - Reference: claude-ppm-sandbox-containment-plan.md Section 2
    - Security-critical path traversal prevention
 
-7. **01_1_5-AUDIT_LOGGING.md** (15 KB, 450+ lines)
+7. **01_1_5-AUDIT_LOGGING.md**
 
    - Audit trail for all operations
    - Minimal performance overhead
    - Queryable by session_id
 
-8. **01_1_6-AGENT_INTEGRATION.md** (30 KB, 900+ lines)
+8. **01_1_6-AGENT_INTEGRATION.md**
 
-   - Custom research-analyst agent (DEFERRED to Phase 2)
+   - Custom research-analyst agent (DEFERRED to future phase)
    - Depends on search functionality and Claude Code MCP integration
    - Reference: claude-ppm-capabilities.md Sections 3-5
 
-9. **01_1_7-INTEGRATION_TESTS.md** (25 KB, 750+ lines)
+9. **01_1_7-INTEGRATION_TESTS.md**
 
    - Comprehensive test suite (>90% coverage)
    - End-to-end, isolation, security, concurrency tests
    - Fuzzing with 20+ attack patterns
 
-10. **01_1_8-DOCUMENTATION_RELEASE.md** (15 KB, 450+ lines)
+10. **01_1_8-DOCUMENTATION_RELEASE.md**
     - README, Docker Compose, API contract
     - Deployment and troubleshooting guides
 
-### Phase 2-4 Overview Documents
-
-11. **02-PHASE_2_COST_QUALITY.md** (10 KB, 300+ lines)
-
-    - Cost optimization (40-50% reduction)
-    - Search quality improvement to 90%+
-    - 5 subphases: incremental indexing, caching, filtering, warm pools, cost monitoring
-
-12. **03-PHASE_3_RERANKING_UX.md** (10 KB, 300+ lines)
-
-    - Semantic reranking to 95%+ precision
-    - Result deduplication
-    - Multi-turn conversations and export
-
-13. **04-PHASE_4_OPERATIONS_SCALE.md** (10 KB, 300+ lines)
-    - Kubernetes deployment (3+ replicas)
-    - 10x throughput, 99%+ uptime
-    - TTL pruning, distributed state, hardening
-
 ### Master Reference
 
-14. **IMPLEMENTATION_ROADMAP.md** (this document)
+11. **IMPLEMENTATION_ROADMAP.md** (this document)
     - Master timeline and critical path
     - Document index and navigation
     - Go/no-go criteria summary
     - Success metrics dashboard
 
-### Original Reference (Unchanged)
-
-15. **IMPLEMENTATION_PLAN.md** (original document, kept as reference)
-    - Master implementation plan
-    - Comprehensive risk register
-    - Unchanged for comparison purposes
-
 ---
 
 ## Critical Path Analysis
 
-**MVP (Phase 1) Critical Path**:
-
-**Note**: Phase 1 uses subprocess-based mcp-vector-search integration. Phase 1.6 (Agent Integration) is deferred to Phase 2. Search functionality is also deferred to Phase 2.
+**Note**: Phase 1 uses subprocess-based mcp-vector-search integration. Phase 1.6 (Agent Integration) is deferred to a future phase. Search functionality is also deferred to a future phase.
 
 ```
 Phase 1.0 (2-3 days) - CLI installation and subprocess verification
-  ↓ (CRITICAL BLOCKER)
+  |
 Phase 1.1 (5-6 days) - Service architecture with WorkspaceIndexer subprocess manager
-  ↓
+  |
 Phase 1.2/1.3/1.4 (can parallel, longest is 1.3 @ 5-6 days)
-  ↓                  1.3 = Indexing Operations (subprocess-based)
+  |                  1.3 = Indexing Operations (subprocess-based)
 Phase 1.5 (2-3 days, audit logging with subprocess events)
-  ↓                  1.6 = DEFERRED to Phase 2
+  |                  1.6 = DEFERRED to future phase
 Phase 1.7 (5-7 days, subprocess + security testing)
-  ↓
+  |
 Phase 1.8 (2 days)
 
 TOTAL: Phase 1.0 (2-3) + 1.1 (5-6) + 1.3 (5-6) + 1.5 (2-3) + 1.7 (5-7) + 1.8 (2)
      = 22-27 calendar days to MVP (3-4 weeks including Phase 1.0)
      (Reduced from 25-31 days due to deferral of Phase 1.6 Agent Integration)
-```
-
-**Production Critical Path**:
-
-```
-Phase 1 (3.5-4.5 weeks)
-  ↓ (BLOCKS ALL PHASES 2-4)
-Phase 2 (3 weeks)
-  ↓ (BLOCKS PHASE 3)
-Phase 3 (3 weeks)
-  ↓ (BLOCKS PHASE 4)
-Phase 4 (3 weeks)
-
-TOTAL: 12-13 weeks to production
 ```
 
 ---
@@ -312,7 +201,7 @@ TOTAL: 12-13 weeks to production
 - Health check endpoint responding
 - Docker image builds successfully
 
-**Decision**: Proceed to Phase 1.2-1.6 parallelization
+**Decision**: Proceed to Phase 1.2-1.5 parallelization
 **Owner**: Tech lead
 
 ---
@@ -332,7 +221,7 @@ TOTAL: 12-13 weeks to production
 
 ---
 
-### Gate 4: Phase 1 Complete - MVP Release (End of Day 24-25)
+### Gate 4: Phase 1 Complete - MVP Release (End of Day 24-27)
 
 **Prerequisites**:
 
@@ -343,49 +232,6 @@ TOTAL: 12-13 weeks to production
 
 **Decision**: Release MVP or defer non-critical features
 **Owner**: Product lead + Executive sponsor
-
----
-
-### Gate 5: Phase 2 Complete - Optimization Done (End of Week 6)
-
-**Prerequisites**:
-
-- Cost reduced to $0.05/query (40% improvement)
-- Search quality 90%+ precision
-- Cache hit rate >40%
-- Latency <5s for agent queries
-
-**Decision**: Proceed to Phase 3 polish
-**Owner**: Tech lead
-
----
-
-### Gate 6: Phase 3 Complete - UX Polish Done (End of Week 9)
-
-**Prerequisites**:
-
-- 95%+ search precision verified
-- Multi-turn conversations working
-- Export functionality complete
-- Production UX review passed
-
-**Decision**: Proceed to Phase 4 operations
-**Owner**: Product lead
-
----
-
-### Gate 7: Phase 4 Complete - Production Ready (End of Week 12)
-
-**Prerequisites**:
-
-- 99%+ uptime verified
-- 10x throughput demonstrated
-- Security audit passed
-- Monitoring and alerting operational
-- Kubernetes deployment working
-
-**Decision**: Deploy to production
-**Owner**: VP Engineering + Executive sponsor
 
 ---
 
@@ -401,39 +247,9 @@ TOTAL: 12-13 weeks to production
 | Path traversal blocked | 100%        | Gate 3 |
 | Core loop working      | 100%        | Gate 4 |
 
-### Phase 2 (Optimization)
-
-| Metric         | Target         | Status |
-| -------------- | -------------- | ------ |
-| Cost per query | $0.05          | Gate 5 |
-| Cache hit rate | >40%           | Gate 5 |
-| Search quality | 90%+ precision | Gate 5 |
-| Agent latency  | <5 seconds     | Gate 5 |
-| Cost reduction | 40-50%         | Gate 5 |
-
-### Phase 3 (Polish)
-
-| Metric         | Target                 | Status |
-| -------------- | ---------------------- | ------ |
-| Search quality | 95%+ precision         | Gate 6 |
-| Agent latency  | 3-5 seconds            | Gate 6 |
-| Deduplication  | 30%+ redundant removed | Gate 6 |
-| Multi-turn     | Working                | Gate 6 |
-
-### Phase 4 (Production)
-
-| Metric         | Target              | Status |
-| -------------- | ------------------- | ------ |
-| Uptime         | 99%+                | Gate 7 |
-| Throughput     | 10x single instance | Gate 7 |
-| Replicas       | 3+                  | Gate 7 |
-| Security audit | Passed              | Gate 7 |
-
 ---
 
 ## Research Document Integration
-
-### By Phase
 
 **Phase 1.0**:
 
@@ -442,14 +258,9 @@ TOTAL: 12-13 weeks to production
 
 **Phase 1.1-1.8**:
 
-- docs/research/mcp-vector-search-rest-api-proposal.md (1,015 lines)
 - docs/research/claude-ppm-capabilities.md (984 lines)
 - docs/research/claude-ppm-sandbox-containment-plan.md (918 lines)
 - docs/research/mcp-vector-search-capabilities.md (680 lines)
-
-**Phase 2-4**:
-
-- docs/research/combined-architecture-recommendations.md (760 lines)
 
 **Analysis**:
 
@@ -468,24 +279,7 @@ TOTAL: 12-13 weeks to production
   - Engineer A: Phase 1.1, 1.2, 1.5 (service architecture, sessions, audit)
   - Engineer B: Phase 1.3, 1.4 (indexing operations, security)
   - Both: Phase 1.7 (integration testing), Phase 1.8 (documentation)
-  - Phase 1.6 (Agent Integration): Deferred to Phase 2
-
-### Phase 2 (Optimization)
-
-- **Total**: 1.5 FTE engineers
-- Can reduce to 1 FTE for later weeks
-- Focus on cost/quality improvements
-
-### Phase 3 (Polish)
-
-- **Total**: 1 FTE engineer
-- UX refinement and quality improvements
-
-### Phase 4 (Operations)
-
-- **Total**: 2 FTE engineers
-- Infrastructure, deployment, hardening
-- Parallel with Phase 3 is possible for some tasks
+  - Phase 1.6 (Agent Integration): Deferred to future phase
 
 ---
 
@@ -493,50 +287,26 @@ TOTAL: 12-13 weeks to production
 
 ### Critical Risks (Addressed in Detail)
 
-1. **Session Isolation Breach** → Multi-layer validation + testing
-2. **Vector Search Token Contamination** → Per-session collections + isolation tests
-3. **Agent Cost Explosion** → Token budgets + auto-summarization (Phase 2.5)
-4. **Prompt-Based Sandbox Failure** → Infrastructure-level path validation (Phase 1.4)
-5. **Indexing Crashes** → Timeout + error handling + resume capability
+1. **Session Isolation Breach** - Multi-layer validation + testing
+2. **Vector Search Token Contamination** - Per-session collections + isolation tests
+3. **Prompt-Based Sandbox Failure** - Infrastructure-level path validation (Phase 1.4)
+4. **Indexing Crashes** - Timeout + error handling + resume capability
 
 ### Risk Escalation Path
 
-- **Phase 1.0**: Dependency blockers → Infrastructure team
-- **Phase 1.1-1.8**: Architecture issues → Tech lead review
-- **Phase 1.7**: Security failures → Security lead + Tech lead
+- **Phase 1.0**: Dependency blockers - Infrastructure team
+- **Phase 1.1-1.8**: Architecture issues - Tech lead review
+- **Phase 1.7**: Security failures - Security lead + Tech lead
 - **Gate failures**: Escalate to Executive sponsor
 
 ---
 
-## Rollout Strategy
-
-### MVP Release (End of Phase 1)
+## MVP Release Plan (End of Phase 1)
 
 1. Internal user testing (engineering team)
 2. Feedback collection on core loop
 3. Bug fixes and minor optimizations
 4. Beta release to select users
-
-### Optimization Release (End of Phase 2)
-
-1. Cost and quality improvements deployed
-2. Caching and filtering enabled
-3. Warm pools operational
-4. Wider user testing
-
-### Polish Release (End of Phase 3)
-
-1. Semantic reranking enabled
-2. Deduplication active
-3. Multi-turn conversations ready
-4. Export functionality available
-
-### Production Release (End of Phase 4)
-
-1. Kubernetes deployment
-2. 99%+ uptime SLA
-3. Multi-region support
-4. Enterprise features enabled
 
 ---
 
@@ -544,33 +314,28 @@ TOTAL: 12-13 weeks to production
 
 ```
 research-mind-project/
-├── docs/
-│   ├── plans/
-│   │   ├── IMPLEMENTATION_ROADMAP.md (this file - master index)
-│   │   ├── IMPLEMENTATION_PLAN.md (original - reference only)
-│   │   ├── 00-PHASE_1_0_ENVIRONMENT_SETUP.md
-│   │   ├── 01-PHASE_1_FOUNDATION.md
-│   │   ├── 01_1_1-SERVICE_ARCHITECTURE.md
-│   │   ├── 01_1_2-SESSION_MANAGEMENT.md
-│   │   ├── 01_1_3-INDEXING_OPERATIONS.md  (renamed from VECTOR_SEARCH_API)
-│   │   ├── 01_1_4-PATH_VALIDATOR.md
-│   │   ├── 01_1_5-AUDIT_LOGGING.md
-│   │   ├── 01_1_6-AGENT_INTEGRATION.md
-│   │   ├── 01_1_7-INTEGRATION_TESTS.md
-│   │   ├── 01_1_8-DOCUMENTATION_RELEASE.md
-│   │   ├── 02-PHASE_2_COST_QUALITY.md
-│   │   ├── 03-PHASE_3_RERANKING_UX.md
-│   │   └── 04-PHASE_4_OPERATIONS_SCALE.md
-│   ├── research/
-│   │   ├── MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md
-│   │   ├── mcp-vector-search-rest-api-proposal.md
-│   │   ├── claude-ppm-capabilities.md
-│   │   ├── claude-ppm-sandbox-containment-plan.md
-│   │   ├── combined-architecture-recommendations.md
-│   │   └── [others]
-│   └── research2/
-│       ├── IMPLEMENTATION_PLAN_ANALYSIS.md
-│       └── MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md
++-- docs/
+    +-- plans/
+    |   +-- IMPLEMENTATION_ROADMAP.md (this file - master index)
+    |   +-- 00-PHASE_1_0_ENVIRONMENT_SETUP.md
+    |   +-- 01-PHASE_1_FOUNDATION.md
+    |   +-- 01_1_1-SERVICE_ARCHITECTURE.md
+    |   +-- 01_1_2-SESSION_MANAGEMENT.md
+    |   +-- 01_1_3-INDEXING_OPERATIONS.md
+    |   +-- 01_1_4-PATH_VALIDATOR.md
+    |   +-- 01_1_5-AUDIT_LOGGING.md
+    |   +-- 01_1_6-AGENT_INTEGRATION.md
+    |   +-- 01_1_7-INTEGRATION_TESTS.md
+    |   +-- 01_1_8-DOCUMENTATION_RELEASE.md
+    +-- research/
+    |   +-- MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md
+    |   +-- claude-ppm-capabilities.md
+    |   +-- claude-ppm-sandbox-containment-plan.md
+    |   +-- combined-architecture-recommendations.md
+    |   +-- [others]
+    +-- research2/
+        +-- IMPLEMENTATION_PLAN_ANALYSIS.md
+        +-- MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md
 ```
 
 ---
@@ -580,8 +345,8 @@ research-mind-project/
 ### For Next Engineer/Team
 
 1. **Start Here**: Read this IMPLEMENTATION_ROADMAP.md (5 min)
-2. **Phase Context**: Read relevant phase overview document (15 min)
-3. **Task Details**: Read specific task document (30 min)
+2. **Phase Context**: Read 01-PHASE_1_FOUNDATION.md (15 min)
+3. **Task Details**: Read specific subphase document (30 min)
 4. **Research**: Consult research documents as referenced (30 min)
 5. **Begin Work**: Start with first unfinished task in phase
 
@@ -594,28 +359,24 @@ research-mind-project/
 
 ---
 
-## Success Indicators
-
-✅ **Phase 1 MVP Complete**: Service running, core loop working, tests passing
-✅ **Phase 2 Optimization**: 40-50% cost reduction achieved
-✅ **Phase 3 Polish**: 95%+ precision, multi-turn conversations
-✅ **Phase 4 Production**: Kubernetes deployment, 99%+ uptime, 10x throughput
-
----
-
-**Document Version**: 1.1
-**Status**: READY FOR EXECUTION (Updated for subprocess-based architecture)
-**Last Updated**: 2026-02-01
-**Next Review**: Phase 1.0 gate completion
-**Maintained By**: Research-Mind Development Team
-
----
-
 ## Quick Links
 
 - [Phase 1.0 Setup](00-PHASE_1_0_ENVIRONMENT_SETUP.md) - Start here for environment
 - [Phase 1 Overview](01-PHASE_1_FOUNDATION.md) - MVP architecture and dependencies
 - [Phase 1.1 Service](01_1_1-SERVICE_ARCHITECTURE.md) - FastAPI and WorkspaceIndexer subprocess manager
-- [Original Plan](IMPLEMENTATION_PLAN.md) - Complete reference document
 
 For questions or updates, refer to the research documents or contact tech lead.
+
+---
+
+## Future Work
+
+Phases for cost optimization, search quality, reranking, and operational scaling will be planned after Phase 1 implementation is complete and real-world behavior is understood.
+
+---
+
+**Document Version**: 2.0
+**Status**: READY FOR EXECUTION (Updated for subprocess-based architecture, Phase 1 focus only)
+**Last Updated**: 2026-02-01
+**Next Review**: Phase 1.0 gate completion
+**Maintained By**: Research-Mind Development Team

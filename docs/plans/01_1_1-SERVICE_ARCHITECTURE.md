@@ -628,9 +628,9 @@ class Settings(BaseSettings):
     audit_logging_enabled: bool = True
 
     # Feature Flags
-    enable_agent_integration: bool = False  # Deferred to Phase 2
-    enable_caching: bool = False  # Phase 2
-    enable_warm_pools: bool = False  # Phase 2
+    enable_agent_integration: bool = False  # Deferred to future phase
+    enable_caching: bool = False  # Future phase
+    enable_warm_pools: bool = False  # Future phase
 
     class Config:
         """Pydantic Settings config."""
@@ -1078,7 +1078,7 @@ def test_configuration_loaded():
 
 ### Secondary References
 
-- **IMPLEMENTATION_PLAN.md** - Phase 1.1 section
+- **IMPLEMENTATION_ROADMAP.md** - Master roadmap for Phase 1
 - **docs/research2/mcp-vector-search-subprocess-integration-research.md** - Complete research findings
 
 ---

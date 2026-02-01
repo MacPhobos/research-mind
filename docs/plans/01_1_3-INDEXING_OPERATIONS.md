@@ -11,12 +11,12 @@
 
 > **ARCHITECTURE NOTE (v2.0)**: This document reflects the subprocess-based architecture.
 > mcp-vector-search runs as a CLI subprocess, NOT as an embedded Python library.
-> Search functionality is COMPLETELY DEFERRED to Phase 2 (will use Claude Code MCP interface).
+> Search functionality is COMPLETELY DEFERRED to a future phase (will use Claude Code MCP interface).
 > This phase focuses exclusively on workspace indexing operations.
 > See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) for details.
 
 > **RENAMED**: This file was previously `01_1_3-VECTOR_SEARCH_API.md`. Renamed to
-> reflect the subprocess-based indexing focus. Search is deferred to Phase 2.
+> reflect the subprocess-based indexing focus. Search is deferred to a future phase.
 
 ---
 
@@ -32,7 +32,7 @@ Create REST API endpoints for workspace indexing operations using mcp-vector-sea
 - Multiple workspaces can be indexed independently
 - Proper error handling for subprocess failures and timeouts
 
-**Explicitly Out of Scope (Deferred to Phase 2)**:
+**Explicitly Out of Scope (Deferred to future phase)**:
 
 - Search endpoints (POST /search) - will use Claude Code MCP interface
 - Per-session ChromaDB collection management
@@ -96,7 +96,7 @@ Create REST API endpoints for workspace indexing operations using mcp-vector-sea
 """
 Pydantic schemas for workspace indexing operations.
 
-NOTE: Search schemas are deferred to Phase 2.
+NOTE: Search schemas are deferred to a future phase.
 This module covers indexing operations only.
 """
 
@@ -353,7 +353,7 @@ Provides:
 - Trigger indexing (POST /api/v1/workspaces/{id}/index)
 - Check index status (GET /api/v1/workspaces/{id}/index/status)
 
-NOTE: Search endpoints are DEFERRED to Phase 2.
+NOTE: Search endpoints are DEFERRED to a future phase.
 Search will use Claude Code's MCP interface to mcp-vector-search.
 """
 
@@ -605,11 +605,11 @@ def test_multi_workspace_isolation(mock_run):
 
 ---
 
-## Phase 2 Design Notes: Search Integration
+## Future Phase Design Notes: Search Integration
 
-> **IMPORTANT**: Search functionality is DEFERRED to Phase 2.
+> **IMPORTANT**: Search functionality is DEFERRED to a future phase.
 >
-> In Phase 2, search queries will flow through Claude Code's MCP interface
+> In a future phase, search queries will flow through Claude Code's MCP interface
 > to mcp-vector-search, NOT through a REST API wrapper in research-mind-service.
 >
 > The architecture will be:
@@ -620,7 +620,7 @@ def test_multi_workspace_isolation(mock_run):
 > ```
 >
 > Phase 1 focuses on ensuring workspaces are properly indexed so that
-> Phase 2 search can find content.
+> Future search functionality can find content.
 
 ---
 
@@ -643,7 +643,7 @@ def test_multi_workspace_isolation(mock_run):
 
 ### Secondary References
 
-- **IMPLEMENTATION_PLAN.md** - Phase 1.3 section
+- **IMPLEMENTATION_ROADMAP.md** - Master roadmap for Phase 1
 - **01-PHASE_1_FOUNDATION.md** - Indexing operations overview
 
 ---
@@ -704,9 +704,9 @@ def test_multi_workspace_isolation(mock_run):
 - Two-step init + index subprocess orchestration
 - Index status checking via .mcp-vector-search/ directory existence
 - Comprehensive error handling for subprocess failures and timeouts
-- Foundation for Phase 2 search integration via Claude Code MCP interface
+- Foundation for future search integration via Claude Code MCP interface
 
-Search functionality is explicitly deferred to Phase 2 where it will use Claude Code's native MCP interface to mcp-vector-search.
+Search functionality is explicitly deferred to a future phase where it will use Claude Code's native MCP interface to mcp-vector-search.
 
 ---
 

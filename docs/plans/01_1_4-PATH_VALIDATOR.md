@@ -388,7 +388,7 @@ class TestPathTraversalAttacks:
 - Middleware for session validation on every request
 - Comprehensive security testing
 - Validation of workspace paths before mcp-vector-search subprocess invocation
-- Foundation for Phase 1.6 agent isolation (deferred to Phase 2)
+- Foundation for Phase 1.6 agent isolation (deferred to future phase)
 
 This is CRITICAL for preventing data exfiltration and cross-session contamination.
 

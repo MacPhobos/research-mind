@@ -12,7 +12,7 @@
 - ✅ **RESEARCH**: `docs/research2/mcp-vector-search-subprocess-integration-research.md` (Verified findings)
 - 📚 LEGACY: mcp-vector-search-packaging-installation.md (1,388 lines)
 - 📚 LEGACY: mcp-vector-search-capabilities.md
-- 📚 LEGACY: mcp-vector-search-rest-api-proposal.md (library-based approach)
+- 📚 LEGACY: ~~mcp-vector-search-rest-api-proposal.md~~ (deleted - library-based approach was abandoned)
 - 📚 LEGACY: PLAN_VS_RESEARCH_ANALYSIS.md
 
 ---
@@ -1628,11 +1628,8 @@ docker-compose config > /dev/null && echo "OK"
    - ChromaDB integration
    - Extension points for REST API
 
-3. **mcp-vector-search-rest-api-proposal.md**
+3. ~~**mcp-vector-search-rest-api-proposal.md**~~ (deleted - library-based approach was abandoned)
 
-   - REST API endpoint specifications
-   - Session management design
-   - Job model and async patterns
    - Security considerations
 
 4. **PLAN_VS_RESEARCH_ANALYSIS.md**

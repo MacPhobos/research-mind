@@ -45,8 +45,8 @@ The **IMPLEMENTATION_PLAN.md** (dated 2026-01-31) demonstrates **strong alignmen
 | ----------------------------------------------- | ----- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | **mcp-vector-search-capabilities.md**           | 680   | Library architecture, indexing flow, search mechanisms, extension points   | HIGH: Plan correctly adopts library approach (not embedding REST)  |
 | **mcp-vector-search-rest-api-proposal.md**      | 1,015 | REST API spec, async job model, Pydantic schemas, per-session collections  | HIGH: Plan's Phase 1.3 directly implements this proposal           |
-| **claude-ppm-capabilities.md**                  | 984   | Session management, tool config, 47+ agents, MCP integration               | HIGH: Plan accounts for session scoping and agent deployment       |
-| **claude-ppm-sandbox-containment-plan.md**      | 918   | Infrastructure-level path validation, session_id enforcement, threat model | HIGH: Plan includes Phase 1.4 path validator as critical           |
+| **claude-mpm-capabilities.md**                  | 984   | Session management, tool config, 47+ agents, MCP integration               | HIGH: Plan accounts for session scoping and agent deployment       |
+| **claude-mpm-sandbox-containment-plan.md**      | 918   | Infrastructure-level path validation, session_id enforcement, threat model | HIGH: Plan includes Phase 1.4 path validator as critical           |
 | **combined-architecture-recommendations.md**    | 760   | Final recommendations, implementation strategy, risk register              | HIGH: Plan mirrors timeline, risks, and phasing                    |
 | **mcp-vector-search-packaging-installation.md** | 1,388 | Practical integration guide, Docker setup, testing strategy                | MEDIUM: Plan references but doesn't detail installation complexity |
 
@@ -69,7 +69,7 @@ The **IMPLEMENTATION_PLAN.md** (dated 2026-01-31) demonstrates **strong alignmen
 | **1.3: Vector Search REST API**      | ✓ Complete REST API proposal document + thin wrapper pattern (REST proposal Section 1.2) | Excellent coverage |
 | **1.4: Path Validator (Sandbox)**    | ✓ Detailed in sandbox containment plan (Section 2.1) with code examples                  | Excellent coverage |
 | **1.5: Minimal Audit Logging**       | ✓ Audit logging strategy (sandbox plan Section 2.3)                                      | Adequate coverage  |
-| **1.6: Agent Integration**           | ✓ Agent capabilities and MCP integration (claude-ppm capabilities Section 3-5)           | Adequate coverage  |
+| **1.6: Agent Integration**           | ✓ Agent capabilities and MCP integration (claude-mpm capabilities Section 3-5)           | Adequate coverage  |
 | **1.7: Integration Tests**           | ✓ Isolation tests recommended (sandbox plan Section 3)                                   | Minimal coverage   |
 | **1.8: Documentation & MVP Release** | ✓ Deployment strategy (combined recommendations Section 9)                               | Adequate coverage  |
 
@@ -155,7 +155,7 @@ The **IMPLEMENTATION_PLAN.md** (dated 2026-01-31) demonstrates **strong alignmen
 
 **Research Coverage**: Excellent
 
-- claude-ppm-sandbox-containment-plan.md (Section 2.1) includes complete PathValidator class code
+- claude-mpm-sandbox-containment-plan.md (Section 2.1) includes complete PathValidator class code
 - Threat model thoroughly analyzed
 - Multiple validation layers documented
 

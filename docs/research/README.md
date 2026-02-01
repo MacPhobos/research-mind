@@ -67,21 +67,11 @@ Deep technical analysis of mcp-vector-search architecture, indexing flow, search
 
 ---
 
-### 2. **mcp-vector-search-rest-api-proposal.md** (1,015 lines)
+### 2. **mcp-vector-search-rest-api-proposal.md** (1,015 lines) - SUPERSEDED
 
-Detailed REST API specification for session-scoped indexing and search.
+**SUPERSEDED** by subprocess-based architecture. This document described a REST API wrapper approach that assumed mcp-vector-search could be embedded as a Python library. The correct architecture uses subprocess invocation instead.
 
-**Key Deliverables**:
-
-- Comprehensive endpoint specifications (Sessions, Indexing, Search)
-- Async job model with progress tracking
-- Pydantic schemas for all requests/responses
-- Mandatory session_id enforcement
-- Per-session collections in shared ChromaDB
-- Example requests/responses for full workflow
-- Security considerations (path validation, rate limiting)
-
-**Architecture**: Wrapper FastAPI service importing mcp-vector-search as library
+**For**: Historical reference only - DO NOT USE FOR IMPLEMENTATION
 
 ---
 
@@ -167,7 +157,7 @@ Final "tell it like it is" recommendations with implementation strategy.
 ### Cost & Latency Optimization
 
 **Baseline** (MVP): ~$0.20/query, 7-13s latency
-**With Phase 2-3 optimizations**: ~$0.05/query, 3-6s latency
+**With future optimizations**: ~$0.05/query, 3-6s latency
 
 **Strategies**:
 
@@ -213,12 +203,10 @@ Final "tell it like it is" recommendations with implementation strategy.
 
 ## Implementation Timeline
 
-| Phase       | Weeks | Deliverable           | Key Completion               |
-| ----------- | ----- | --------------------- | ---------------------------- |
-| **MVP**     | 1-3   | Core research loop    | Session isolation working    |
-| **Phase 2** | 4-6   | Search quality (90%+) | Hybrid retrieval + filtering |
-| **Phase 3** | 7-9   | Production polish     | Reranking + deduplication    |
-| **Phase 4** | 10-12 | Scale ready           | Multi-instance deployment    |
+| Phase      | Weeks | Deliverable                 | Key Completion            |
+| ---------- | ----- | --------------------------- | ------------------------- |
+| **MVP**    | 1-3   | Core research loop          | Session isolation working |
+| **Future** | TBD   | Search, optimization, scale | Planned after Phase 1     |
 
 ---
 

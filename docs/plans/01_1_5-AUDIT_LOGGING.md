@@ -251,7 +251,7 @@ Audit logging integrates with:
 - **Phase 1.3 (Indexing Operations)**: Log every subprocess spawn, completion, and error for indexing
 - **Phase 1.2**: Log session creation/deletion
 - **Phase 1.4**: Log blocked path traversal attempts (including invalid workspace paths before subprocess invocation)
-- **Phase 1.6**: Log agent invocations (deferred to Phase 2)
+- **Phase 1.6**: Log agent invocations (deferred to future phase)
 
 ---
 
@@ -280,7 +280,7 @@ Audit logging integrates with:
 - Debugging (subprocess exit codes, elapsed times, stderr capture)
 - Subprocess lifecycle tracking (spawn, complete, error, timeout)
 
-This foundation enables Phase 2 analysis and Phase 4 compliance requirements.
+This foundation enables future analysis and compliance requirements.
 
 ---
 

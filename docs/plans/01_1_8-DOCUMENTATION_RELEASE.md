@@ -9,7 +9,7 @@
 
 > **ARCHITECTURE NOTE (v2.0)**: This document reflects the subprocess-based architecture.
 > Phase 1 MVP delivers workspace registration and indexing (not search/analysis).
-> Search and agent analysis are deferred to Phase 2.
+> Search and agent analysis are deferred to a future phase.
 > See `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) for details.
 
 ---
@@ -140,7 +140,7 @@ Expected: >90% coverage, all tests pass
 - Session/workspace isolation enforced
 - Audit logging for all operations
 
-## Phase 2 (Planned)
+## Future (Planned)
 
 - Search via Claude Code MCP interface
 - Agent analysis with citations
@@ -212,7 +212,7 @@ Create **docs/api-contract.md** documenting all endpoints with:
 - Status codes
 - Error responses
 - Examples
-- Note that search/analyze endpoints are Phase 2
+- Note that search/analyze endpoints are planned for a future phase
 
 ### Task 1.8.4: Deployment Guide
 
@@ -277,7 +277,7 @@ Reference: `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) Troubl
 - Referencing subprocess integration guide (v2.0) for implementation details
 
 **Phase 1 MVP scope**: Workspace registration and indexing service.
-Search and agent analysis are Phase 2 features.
+Search and agent analysis are planned for a future phase.
 
 ---
 
