@@ -2,6 +2,8 @@
 
 **Session-based content retrieval and orchestration for focused research**
 
+> **New to the project?** See the [Getting Started Guide](docs/GETTING_STARTED.md) for complete installation instructions.
+
 ## Overview
 
 Research-Mind provides a content retrieval and orchestration layer that allows users to create research sessions. Each session tracks user-added content sources (URLs, Git repos, PDFs, raw text) and enables question-answering based ONLY on that session's curated content.
@@ -95,7 +97,7 @@ flowchart LR
 | Frontend       | SvelteKit 5, TypeScript | User interface                    |
 | Vector Search  | mcp-vector-search       | Content indexing and retrieval    |
 | Agent Runtime  | claude-mpm              | Agentic question answering        |
-| Metadata Store | PostgreSQL 16           | Sessions, sources, audit logs     |
+| Metadata Store | PostgreSQL 18           | Sessions, sources, audit logs     |
 
 ## Quick Start
 
@@ -111,6 +113,12 @@ make dev
 
 - Service API: http://localhost:15010
 - Web UI: http://localhost:15000
+
+**Verify installation:**
+
+```bash
+./scripts/verify-install.sh
+```
 
 For detailed setup instructions, see the sub-project documentation.
 
@@ -158,10 +166,6 @@ research-mind/
 - PDF content extractor
 - Enhanced agent capabilities
 - UI refinements
-
-## Contributing
-
-Contributions are welcome. Please see the development guides in each sub-project's CLAUDE.md for coding standards and patterns.
 
 ## License
 

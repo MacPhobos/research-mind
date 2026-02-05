@@ -1,0 +1,94 @@
+# =============================================================================
+# research-mind Combined (Backend + Frontend)
+# =============================================================================
+# Serves both the API and the frontend from a single container.
+# Requires external PostgreSQL database.
+#
+# Build:  docker build -f Dockerfile.combined -t research-mind .
+# Run:    docker run -p 15010:15010 -p 15000:15000 \
+#           -e DATABASE_URL=postgresql+psycopg://... \
+#           research-mind
+
+# ---------- Stage 1: Build Frontend ----------
+FROM node:20-alpine AS ui-builder
+
+WORKDIR /ui
+
+COPY research-mind-ui/package.json research-mind-ui/package-lock.json ./
+RUN npm ci
+
+COPY research-mind-ui/ .
+
+ARG VITE_API_BASE_URL=http://localhost:15010
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+RUN npm run build
+
+# ---------- Stage 2: Build Backend ----------
+FROM python:3.12-slim AS backend-builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Copy and install backend dependencies
+COPY research-mind-service/pyproject.toml ./
+RUN pip install --no-cache-dir --prefix=/install .
+
+# ---------- Stage 3: Runtime ----------
+FROM python:3.12-slim AS runtime
+
+WORKDIR /app
+
+# Install runtime dependencies including Node.js
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    gnupg \
+    libpq5 \
+    wget \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python packages from builder
+COPY --from=backend-builder /install /usr/local
+
+# Copy backend application
+COPY research-mind-service/app ./app
+COPY research-mind-service/migrations ./migrations
+COPY research-mind-service/alembic.ini ./
+
+# Copy frontend build and dependencies
+COPY --from=ui-builder /ui/build ./ui/build
+COPY --from=ui-builder /ui/package.json ./ui/
+COPY --from=ui-builder /ui/node_modules ./ui/node_modules
+
+# Create workspace directory
+RUN mkdir -p /var/lib/research-mind/workspaces
+
+# Copy entrypoint script
+COPY scripts/docker-entrypoint-combined.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash appuser && \
+    chown -R appuser:appuser /app /var/lib/research-mind
+
+USER appuser
+
+EXPOSE 15010 15000
+
+# Health check for both services
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -sf http://localhost:15010/health && wget --no-verbose --tries=1 --spider http://localhost:15000 || exit 1
+
+ENV WORKSPACE_DIR=/var/lib/research-mind/workspaces
+
+ENTRYPOINT ["/entrypoint.sh"]
