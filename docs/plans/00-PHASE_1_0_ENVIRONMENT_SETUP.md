@@ -261,7 +261,7 @@ mcp-vector-search init --force
 
    ```bash
    # macOS (via Homebrew)
-   brew services start postgresql@15
+   brew services start postgresql@18
 
    # Linux (Ubuntu/Debian)
    sudo systemctl start postgresql
@@ -1202,7 +1202,7 @@ All criteria must be met before Phase 1.1 can begin:
 ### External Dependencies (Must be installed before Phase 1.0)
 
 - Python 3.12+
-- PostgreSQL 13+
+- PostgreSQL 18+
 - Docker (optional for Phase 1.0, required by Phase 1.8)
 - uv package manager
 

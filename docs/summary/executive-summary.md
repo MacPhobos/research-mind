@@ -169,7 +169,7 @@ flowchart TB
     end
 
     subgraph Storage["Data Layer"]
-        PG[(PostgreSQL 16<br>Sessions & Metadata)]
+        PG[(PostgreSQL 18<br>Sessions & Metadata)]
         VS[(mcp-vector-search<br>Vector Index)]
     end
 
@@ -186,7 +186,7 @@ flowchart TB
 | Backend            | FastAPI, Python 3.12    | API services                  |
 | Content Retrievers | Python modules          | Source-specific ingestion     |
 | Vector Index       | mcp-vector-search       | Session-scoped embeddings     |
-| Metadata Store     | PostgreSQL 16           | Sessions, sources, audit logs |
+| Metadata Store     | PostgreSQL 18           | Sessions, sources, audit logs |
 | Agent Runtime      | claude-mpm              | Agentic question answering    |
 
 ---

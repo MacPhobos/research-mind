@@ -56,7 +56,7 @@ research-mind/
 | **Vector DB**     | ChromaDB (SQLite)        | Session-scoped embeddings and vector search                 |
 | **Indexing**      | mcp-vector-search        | Code/document parsing, chunking, embedding                  |
 | **Agent Runtime** | claude-mpm               | Multi-agent orchestration for question-answering            |
-| **Database**      | PostgreSQL 16            | Session metadata, audit logs, job tracking                  |
+| **Database**      | PostgreSQL 18            | Session metadata, audit logs, job tracking                  |
 | **Development**   | Docker Compose           | Local development stack (postgres + services)               |
 
 ### Service Ports

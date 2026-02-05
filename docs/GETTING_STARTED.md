@@ -11,13 +11,13 @@ This guide walks you through setting up the research-mind monorepo for local dev
 ### Required Software
 
 | Software       | Minimum Version | Purpose                                  | Check Command            |
-| -------------- | --------------- | ---------------------------------------- | ------------------------ |
-| Python         | 3.12+           | Backend runtime                          | `python3 --version`      |
-| Node.js        | 20.x or 22.x    | Frontend runtime                         | `node --version`         |
-| npm            | 10.x+           | Frontend package manager                 | `npm --version`          |
-| PostgreSQL     | 15+             | Database                                 | `psql --version`         |
-| Docker         | 24+             | Container runtime (optional)             | `docker --version`       |
-| Docker Compose | 2.20+           | Multi-container orchestration (optional) | `docker compose version` |
+| -------------- |---------------| ---------------------------------------- | ------------------------ |
+| Python         | 3.12+         | Backend runtime                          | `python3 --version`      |
+| Node.js        | 22.x          | Frontend runtime                         | `node --version`         |
+| npm            | 10.x+         | Frontend package manager                 | `npm --version`          |
+| PostgreSQL     | 15+           | Database                                 | `psql --version`         |
+| Docker         | 29+           | Container runtime (optional)             | `docker --version`       |
+| Docker Compose | 5+            | Multi-container orchestration (optional) | `docker compose version` |
 
 ### Installation by Platform
 
@@ -33,8 +33,8 @@ nvm install 22
 nvm use 22
 
 # PostgreSQL (if not using Docker)
-brew install postgresql@15
-brew services start postgresql@15
+brew install postgresql@18
+brew services start postgresql@18
 
 # Docker Desktop (includes Docker Compose)
 brew install --cask docker
@@ -52,8 +52,8 @@ sudo apt install python3.12 python3.12-venv
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 
-# PostgreSQL 15 (if not using Docker)
-sudo apt install postgresql-15
+# PostgreSQL 18 (if not using Docker)
+sudo apt install postgresql-18
 
 # Docker
 sudo apt install docker.io docker-compose-plugin
@@ -210,7 +210,7 @@ docker run -d \
   -e POSTGRES_PASSWORD=devpass123 \
   -e POSTGRES_DB=research_mind \
   -v research-mind-pgdata:/var/lib/postgresql/data \
-  postgres:15-alpine
+  postgres:18-alpine
 
 # Start Research Mind
 docker run -d \
