@@ -1,8 +1,33 @@
-.PHONY: help install dev stop test lint fmt typecheck gen-client db-up db-reset clean
+.PHONY: help setup init install dev stop test lint fmt typecheck gen-client db-up db-reset clean
 
 help:
 	@echo "Available targets:"
 	@grep "^[a-z-]*:" Makefile | cut -d: -f1 | sed 's/^/  make /'
+
+setup:
+	@echo "Setting up environment files..."
+	@if [ -f .env ]; then \
+		echo "  SKIP: .env already exists"; \
+	else \
+		cp .env.example .env; \
+		echo "  CREATED: .env"; \
+	fi
+	@if [ -f research-mind-service/.env ]; then \
+		echo "  SKIP: research-mind-service/.env already exists"; \
+	else \
+		cp research-mind-service/.env.example research-mind-service/.env; \
+		echo "  CREATED: research-mind-service/.env"; \
+	fi
+	@if [ -f research-mind-ui/.env ]; then \
+		echo "  SKIP: research-mind-ui/.env already exists"; \
+	else \
+		cp research-mind-ui/.env.example research-mind-ui/.env; \
+		echo "  CREATED: research-mind-ui/.env"; \
+	fi
+	@echo ""
+	@echo "Setup complete. You can customize the .env files as needed."
+
+init: setup
 
 install:
 	@echo "Installing dependencies..."

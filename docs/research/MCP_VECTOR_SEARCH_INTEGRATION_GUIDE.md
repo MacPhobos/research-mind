@@ -118,7 +118,6 @@ python3 --version
 # If not 3.12+, consider:
 # - macOS: brew install python@3.12
 # - Ubuntu: sudo apt install python3.12 python3.12-venv
-# - Windows: Download from python.org
 ```
 
 **Why**: mcp-vector-search requires Python 3.12+. FastAPI and other dependencies have similar requirements.
@@ -136,7 +135,6 @@ python3.12 -m venv .venv
 
 # Activate
 source .venv/bin/activate
-# On Windows: .venv\Scripts\activate
 
 # Verify activation
 which python  # Should show /path/to/.venv/bin/python
@@ -1213,7 +1211,7 @@ Create `docs/PHASE_1_0_BASELINE.md` documenting:
 
 - **Python Version**: [e.g., 3.12.1]
 - **Virtual Environment**: [e.g., /Users/mac/workspace/research-mind/.venv]
-- **OS**: [macOS/Linux/Windows]
+- **OS**: [macOS/Linux]
 - **Architecture**: [x86_64/ARM64]
 - **Disk Space Available**: [e.g., 150GB /]
 

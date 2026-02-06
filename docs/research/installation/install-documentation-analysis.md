@@ -304,10 +304,6 @@ pip install uv
 
 # Specific commands...
 
-### Windows
-
-# WSL2 recommended, then Linux instructions
-
 ## Quick Start (5 minutes)
 
 1. Clone and install

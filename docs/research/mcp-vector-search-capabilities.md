@@ -564,7 +564,7 @@ Available strategies:
 
 1. **Search-Triggered**: Check for stale files during search
 2. **Git Hooks**: Post-commit, post-merge hooks
-3. **Scheduled Tasks**: Cron/Windows tasks
+3. **Scheduled Tasks**: Cron jobs
 4. **Manual Check**: Via CLI command
 
 **For Research-Mind**: Disable auto-reindex, use explicit job model
