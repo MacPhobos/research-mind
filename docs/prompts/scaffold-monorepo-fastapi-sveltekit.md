@@ -28,7 +28,7 @@ Before scaffolding, collect these inputs from the user and confirm:
 
    - Prompt: "Set a local Postgres password for development (e.g., 'devpass123')"
    - Validation: Minimum 8 chars
-   - Store in: `.env.example` and `docker-compose.yml`
+   - Store in: `.env.example` and `docker compose.yml`
 
 5. **API Domain** (optional, for production reference):
    - Prompt: "Production API domain? (e.g., 'api.myapp.com', or 'not-decided-yet')"
@@ -62,7 +62,7 @@ Create the following layout:
 │   ├── README.md
 │   ├── api-contract.md          # API contract (source of truth)
 │   └── SETUP.md                 # Bootstrapping guide
-├── docker-compose.yml
+├── docker compose.yml
 ├── Makefile
 ├── .tool-versions               # asdf tooling
 ├── .env.example
@@ -128,7 +128,7 @@ install:
 
 dev:
 	@echo "Starting dev stack (Service + UI + Postgres)..."
-	docker-compose up -d postgres
+	docker compose up -d postgres
 	@sleep 2
 	@cd {FOO}-service && uv run uvicorn app.main:app --host 0.0.0.0 --port {SERVICE_PORT} --reload &
 	@cd {FOO}-ui && npm run dev &
@@ -140,7 +140,7 @@ dev:
 stop:
 	pkill -f "uvicorn" || true
 	pkill -f "vite" || true
-	docker-compose down
+	docker compose down
 
 test:
 	@echo "Running tests..."
@@ -168,30 +168,30 @@ gen-client:
 	@echo "✓ Client generated at {FOO}-ui/src/lib/api/generated.ts"
 
 db-up:
-	docker-compose up -d postgres
+	docker compose up -d postgres
 	@sleep 2
 	@echo "✓ Postgres running on localhost:5432"
 
 db-reset:
-	docker-compose down -v
-	docker-compose up -d postgres
+	docker compose down -v
+	docker compose up -d postgres
 	@sleep 2
 	@cd {FOO}-service && uv run alembic upgrade head
 	@echo "✓ Database reset and migrated"
 
 clean:
 	rm -rf {FOO}-ui/node_modules {FOO}-service/.venv
-	docker-compose down -v
+	docker compose down -v
 	@echo "✓ Cleaned"
 ```
 
-### 2.4 `docker-compose.yml`
+### 2.4 `docker compose.yml`
 
 ```yaml
 version: "3.8"
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -255,7 +255,7 @@ All changes to the API must:
 
 ### Service Port: {SERVICE_PORT}
 
-- Change in root `.env` and `docker-compose.yml`
+- Change in root `.env` and `docker compose.yml`
 - Update UI's `VITE_API_BASE_URL`
 
 ### UI Port: {UI_PORT}
@@ -818,7 +818,7 @@ Verify in order:
 
 - `Makefile`
 - `.tool-versions`
-- `docker-compose.yml`
+- `docker compose.yml`
 - `.env.example`
 - `CLAUDE.md`
 - `docs/README.md`

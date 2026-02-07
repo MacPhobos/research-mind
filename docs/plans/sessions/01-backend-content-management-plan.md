@@ -2,7 +2,7 @@
 
 > **Status**: Ready for implementation
 > **Design Doc**: `docs/designs/sessions/01-backend-session-content-architecture.md`
-> **Service**: research-mind-service (FastAPI, Python 3.12, SQLAlchemy 2.0, Alembic, PostgreSQL 18)
+> **Service**: research-mind-service (FastAPI, Python 3.12, SQLAlchemy 2.0, Alembic, PostgreSQL 16)
 > **Date**: 2026-02-01
 
 ---

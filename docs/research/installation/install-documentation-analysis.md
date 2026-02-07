@@ -97,7 +97,7 @@ The following are **required but not explained**:
 | ----------------------- | ----------------------------- | ------------------------------------------------------------- |
 | Python 3.12+            | Service README                | **Not documented**                                            |
 | `uv` package manager    | Service README                | **Not documented** - Link provided only                       |
-| PostgreSQL 18+          | Service README                | **Not documented**                                            |
+| PostgreSQL 16+          | Service README                | **Not documented**                                            |
 | `mcp-vector-search` CLI | Service README, DEPLOYMENT.md | **Not documented** - "install according to its documentation" |
 | Node.js 20.x/22.x       | UI README                     | **Not documented**                                            |
 | npm 10.x+               | UI README                     | **Not documented**                                            |
@@ -145,7 +145,7 @@ Documentation assumes developers already know:
 ```yaml
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:16-alpine
     # Health check, volumes, credentials
 
   service:
@@ -295,7 +295,7 @@ Create `/docs/GETTING_STARTED.md` with:
 
 ### macOS
 
-brew install python@3.12 postgresql@18 node@20
+brew install python@3.12 postgresql@16 node@20
 pip install uv
 
 # Install mcp-vector-search (link/instructions)

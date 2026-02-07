@@ -37,7 +37,7 @@ install:
 
 dev:
 	@echo "Starting dev stack (Service + UI + Postgres)..."
-	docker-compose up -d postgres
+	docker compose up -d postgres
 	@sleep 2
 	@cd research-mind-service && uv run uvicorn app.main:app --host 0.0.0.0 --port 15010 --reload &
 	@cd research-mind-ui && npm run dev &
@@ -49,7 +49,7 @@ dev:
 stop:
 	pkill -f "uvicorn" || true
 	pkill -f "vite" || true
-	docker-compose down
+	docker compose down
 
 test:
 	@echo "Running tests..."
@@ -77,18 +77,18 @@ gen-client:
 	@echo "✓ Client generated at research-mind-ui/src/lib/api/generated.ts"
 
 db-up:
-	docker-compose up -d postgres
+	docker compose up -d postgres
 	@sleep 2
 	@echo "✓ Postgres running on localhost:5432"
 
 db-reset:
-	docker-compose down -v
-	docker-compose up -d postgres
+	docker compose down -v
+	docker compose up -d postgres
 	@sleep 2
 	@cd research-mind-service && uv run alembic upgrade head
 	@echo "✓ Database reset and migrated"
 
 clean:
 	rm -rf research-mind-ui/node_modules research-mind-service/.venv
-	docker-compose down -v
+	docker compose down -v
 	@echo "✓ Cleaned"

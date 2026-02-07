@@ -20,7 +20,7 @@ Complete documentation and enable local deployment. MVP is production-ready afte
 
 **Success Definition**:
 
-- Can boot entire system with `docker-compose up`
+- Can boot entire system with `docker compose up`
 - All endpoints documented with examples
 - Configuration documented
 - Error codes documented
@@ -31,7 +31,7 @@ Complete documentation and enable local deployment. MVP is production-ready afte
 ## Deliverables
 
 1. **research-mind-service/README.md** - Setup, architecture, examples
-2. **docker-compose.yml** (at root) - Local dev environment
+2. **docker compose.yml** (at root) - Local dev environment
 3. **research-mind-service/Dockerfile** (updated) - Multi-stage build
 4. **docs/api-contract.md** - OpenAPI contract
 5. **DEPLOYMENT.md** - Production deployment guide
@@ -55,7 +55,7 @@ subprocess for codebase indexing.
 
 ```bash
 # Start service
-docker-compose up
+docker compose up
 
 # Create session
 curl -X POST http://localhost:15010/api/sessions \
@@ -150,14 +150,14 @@ Expected: >90% coverage, all tests pass
 
 ### Task 1.8.2: Docker Compose Setup
 
-Create **docker-compose.yml** (at root):
+Create **docker compose.yml** (at root):
 
 ```yaml
 version: '3.8'
 
 services:
   postgres:
-    image: postgres:18
+    image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -241,7 +241,7 @@ Reference: `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) Troubl
 
 ## Release Checklist
 
-- [ ] `docker-compose up` works end-to-end
+- [ ] `docker compose up` works end-to-end
 - [ ] Service starts healthily (health check passes)
 - [ ] mcp-vector-search CLI available inside container
 - [ ] Subprocess invocation works from inside container
@@ -257,7 +257,7 @@ Reference: `docs/research2/MCP_VECTOR_SEARCH_INTEGRATION_GUIDE.md` (v2.0) Troubl
 
 ## Acceptance Criteria
 
-- [ ] `docker-compose up` works end-to-end
+- [ ] `docker compose up` works end-to-end
 - [ ] Service starts healthily
 - [ ] All endpoints documented
 - [ ] Examples work as documented

@@ -59,7 +59,7 @@ The system combines semantic code indexing (mcp-vector-search) with Claude agent
   - TanStack Query         - Session CRUD             - mcp-vector-search
   - Zod Validation         - Path Validator             (Subprocess)
   - Type-safe API          - Audit Logging            - claude-mpm (Agent)
-                           - Workspace Manager        - PostgreSQL 18
+                           - Workspace Manager        - PostgreSQL 16
                            - Indexing Jobs            - ChromaDB
 ```
 
@@ -72,7 +72,7 @@ The system combines semantic code indexing (mcp-vector-search) with Claude agent
 | **Vector DB** | ChromaDB (SQLite) | Session-scoped embeddings and similarity search |
 | **Indexing Engine** | mcp-vector-search | Code/document parsing, chunking, embedding |
 | **Agent Runtime** | claude-mpm | Multi-agent orchestration for Q&A |
-| **Database** | PostgreSQL 18 | Session metadata, audit logs, job tracking |
+| **Database** | PostgreSQL 16 | Session metadata, audit logs, job tracking |
 
 ### Key Architectural Decisions
 

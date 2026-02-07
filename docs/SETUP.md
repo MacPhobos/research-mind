@@ -32,7 +32,7 @@ lsof -i :15010  # Check what's using port
 **Docker issues**:
 ```bash
 make stop
-docker-compose down -v
+docker compose down -v
 make dev
 ```
 

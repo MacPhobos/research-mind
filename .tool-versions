@@ -1,2 +1,4 @@
 python 3.12.11
 nodejs 22.21.1
+uv 0.10.0
+pipx 1.8.0

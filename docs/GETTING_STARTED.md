@@ -2,7 +2,7 @@
 
 This guide walks you through setting up the research-mind monorepo for local development.
 
-**Supported platforms**: macOS and Linux only
+**Supported platforms**: macOS and Ubuntu only (Windows is not supported)
 
 **Time to first run**: 10-15 minutes
 
@@ -24,11 +24,15 @@ cd research-mind
 git clone git@github.com:MacPhobos/research-mind-service.git research-mind-service
 git clone git@github.com:MacPhobos/research-mind-ui.git research-mind-ui
 make setup             # Create .env files from examples
+# >>> Review and customize .env files if needed <<<
 make install           # Install all dependencies
 docker compose up -d postgres  # Start PostgreSQL
+# Run database migrations (separate step -- not included in make dev)
 cd research-mind-service && uv run alembic upgrade head && cd ..
 make dev               # Start service (15010) + UI (15000)
 ```
+
+> **Note**: `make setup` and `make install` are intentionally separate commands. `make setup` creates `.env` files from examples, giving you the opportunity to review and customize environment variables (such as `DATABASE_URL` and ports) before `make install` installs dependencies.
 
 Verify: http://localhost:15000
 
@@ -45,7 +49,8 @@ Need detailed instructions? Continue reading below.
 | Python         | 3.12+         | Backend runtime                          | `python3 --version`      |
 | Node.js        | 22.x          | Frontend runtime                         | `node --version`         |
 | npm            | 10.x+         | Frontend package manager                 | `npm --version`          |
-| PostgreSQL     | 15+ (18 recommended) | Database                          | `psql --version`         |
+| PostgreSQL     | 15+ (16 recommended) | Database                          | `psql --version`         |
+| pipx           | 1.8+          | Global tool installer (mcp-vector-search, claude-mpm) | `pipx --version`         |
 | Docker         | 29+           | Container runtime (optional)             | `docker --version`       |
 | Docker Compose | 5+            | Multi-container orchestration (optional) | `docker compose version` |
 
@@ -62,9 +67,9 @@ brew install nvm
 nvm install 22
 nvm use 22
 
-# PostgreSQL 15+ (18 recommended) - if not using Docker
-brew install postgresql@18
-brew services start postgresql@18
+# PostgreSQL 15+ (16 recommended) - if not using Docker
+brew install postgresql@16
+brew services start postgresql@16
 
 # Docker Desktop (includes Docker Compose)
 brew install --cask docker
@@ -82,8 +87,8 @@ sudo apt install python3.12 python3.12-venv
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 
-# PostgreSQL 15+ (18 recommended) - if not using Docker
-sudo apt install postgresql-18
+# PostgreSQL 15+ (16 recommended) - if not using Docker
+sudo apt install postgresql-16
 
 # Docker
 sudo apt install docker.io docker-compose-plugin
@@ -110,6 +115,32 @@ Verify installation:
 uv --version
 ```
 
+### Install pipx
+
+`pipx` is required for installing `mcp-vector-search` and `claude-mpm` as globally available CLI tools:
+
+```bash
+# macOS
+brew install pipx
+pipx ensurepath
+
+# Ubuntu/Debian
+sudo apt install pipx
+pipx ensurepath
+```
+
+After installation, restart your terminal or run:
+
+```bash
+source ~/.bashrc  # or ~/.zshrc
+```
+
+Verify installation:
+
+```bash
+pipx --version
+```
+
 ### Optional: mcp-vector-search CLI
 
 The project uses `mcp-vector-search` for semantic code search and indexing. Without it installed globally, indexing features will be disabled but the application will still function.
@@ -120,7 +151,9 @@ The project uses `mcp-vector-search` for semantic code search and indexing. With
 
 [ASDF](https://asdf-vm.com/) is the recommended tool version manager for this project. It reads the `.tool-versions` file in the repository root and ensures you have exactly the right versions of Python, Node.js, uv, and pipx.
 
-**ASDF is optional.** If you do not use ASDF, you must install the correct tool versions manually (see the Prerequisites section above).
+**ASDF 0.18+ required.** This project requires ASDF 0.18.0 or later (the Go rewrite). The legacy bash version of ASDF is not supported. On macOS, `brew install asdf` installs the Go version by default. On Linux, ensure you install from the correct release (see below).
+
+Users who prefer not to use ASDF must install all tooling dependencies manually at the versions specified in `.tool-versions`. This is the user's responsibility.
 
 ### Current Tool Versions (.tool-versions)
 
@@ -133,11 +166,12 @@ The project uses `mcp-vector-search` for semantic code search and indexing. With
 
 ### Installing ASDF
 
-**CRITICAL**: ASDF 0.18.0 or later is required. Do not install an earlier version. Older versions have incompatible plugin behavior and will not work correctly with this project.
+**CRITICAL**: ASDF 0.18.0 or later (the Go rewrite) is required. Do not install the legacy bash version. Older versions have incompatible plugin behavior and will not work correctly with this project.
 
 #### macOS (Homebrew)
 
 ```bash
+# Installs the Go version by default (0.18+)
 brew install asdf
 
 # Add to your shell profile (~/.zshrc or ~/.bashrc)
@@ -145,9 +179,10 @@ echo -e "\n. $(brew --prefix asdf)/libexec/asdf.sh" >> ~/.zshrc
 source ~/.zshrc
 ```
 
-#### Linux (git clone)
+#### Ubuntu/Linux
 
 ```bash
+# Download the Go binary release (not the legacy bash version)
 git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.18.0
 echo -e '\n. "$HOME/.asdf/asdf.sh"' >> ~/.bashrc
 echo -e '\n. "$HOME/.asdf/completions/asdf.bash"' >> ~/.bashrc
@@ -209,6 +244,23 @@ Use **full containerized dev** when you want to verify Docker builds or test in 
 
 ---
 
+## Pre-Flight: Port Conflict Detection
+
+Before starting services, verify that the default ports are available:
+
+```bash
+# Check for conflicts on the service port (15010)
+lsof -i :15010
+# Check for conflicts on the UI port (15000)
+lsof -i :15000
+# Check for conflicts on the PostgreSQL port (5432)
+lsof -i :5432
+```
+
+If any of these commands return output, another process is using that port. Either stop the conflicting process or configure alternative ports (see the [Changing Ports](#changing-ports) section below).
+
+---
+
 ## Installation
 
 Choose **Option A** (Docker for everything) for the quickest start, or **Option B** (Local development) for full development flexibility with hot-reload.
@@ -263,6 +315,10 @@ cd research-mind
 git clone git@github.com:MacPhobos/research-mind-service.git research-mind-service
 git clone git@github.com:MacPhobos/research-mind-ui.git research-mind-ui
 
+# Copy environment files (do this FIRST so you can review/customize)
+make setup
+# >>> Review .env files and adjust DATABASE_URL, ports, etc. if needed <<<
+
 # Install all dependencies (backend + frontend)
 make install
 
@@ -272,17 +328,14 @@ docker compose up -d postgres
 # Wait for PostgreSQL to be ready
 sleep 3
 
-# Copy environment files
-cp .env.example .env
-cp research-mind-service/.env.example research-mind-service/.env
-cp research-mind-ui/.env.example research-mind-ui/.env
-
-# Apply database migrations
+# Apply database migrations (explicit separate step)
 cd research-mind-service && uv run alembic upgrade head && cd ..
 
-# Start the development stack
+# Start the development stack (does NOT run migrations)
 make dev
 ```
+
+> **Important**: `make dev` does NOT auto-run database migrations. Always run `alembic upgrade head` explicitly after database setup and whenever new migrations are added.
 
 This starts:
 
@@ -359,7 +412,7 @@ Expected: Returns `1` without errors.
 
 ### Using an Existing PostgreSQL Instance
 
-If you already have PostgreSQL 15+ (18 recommended) running locally:
+If you already have PostgreSQL 15+ (16 recommended) running locally:
 
 1. **Create the database**:
 
@@ -413,6 +466,8 @@ Update these files:
 - `.env`: Update `DATABASE_URL` with new port
 
 ### Environment Variables Reference
+
+> **DATABASE_URL format**: The canonical format uses the `postgresql+psycopg://` prefix (with psycopg3 async driver). The format in `.env.example` is the source of truth. Do not use `postgresql://` or `postgres://` -- always use `postgresql+psycopg://`.
 
 | Variable            | Default                                                                 | Description                                     |
 | ------------------- | ----------------------------------------------------------------------- | ----------------------------------------------- |
@@ -474,16 +529,25 @@ make stop
 
 **Symptom**: Error like "address already in use" when starting services.
 
+**Diagnosis**:
+
+```bash
+# Check what is using each port
+lsof -i :15010  # Backend service port
+lsof -i :15000  # Frontend UI port
+lsof -i :5432   # PostgreSQL port
+```
+
 **Solution**:
 
 ```bash
-# Find what's using the port
-lsof -ti:15010  # For backend
-lsof -ti:15000  # For frontend
-
-# Kill the process
+# Option 1: Kill the conflicting process
 lsof -ti:15010 | xargs kill -9
+
+# Option 2: Use alternative ports (see "Changing Ports" section above)
 ```
+
+If port 5432 is in use by a local PostgreSQL installation, either stop it or update `DATABASE_URL` and `docker-compose.yml` to use a different port.
 
 ### Database Connection Refused
 

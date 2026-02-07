@@ -261,13 +261,13 @@ mcp-vector-search init --force
 
    ```bash
    # macOS (via Homebrew)
-   brew services start postgresql@18
+   brew services start postgresql@16
 
    # Linux (Ubuntu/Debian)
    sudo systemctl start postgresql
 
    # Docker
-   docker-compose up -d postgres
+   docker compose up -d postgres
    ```
 
 2. **Verify Connection**
@@ -634,7 +634,7 @@ class WorkspaceIndexer:
 
 ### 1.0.7: Verify Docker (1 hour)
 
-**Objective**: Ensure Docker and docker-compose are installed and working
+**Objective**: Ensure Docker and docker compose are installed and working
 
 #### Steps
 
@@ -645,10 +645,10 @@ class WorkspaceIndexer:
    # Expected: Docker version 20.10+ or higher
    ```
 
-2. **Check docker-compose Installation**
+2. **Check docker compose Installation**
 
    ```bash
-   docker-compose --version
+   docker compose --version
    # Expected: Docker Compose version 2.0+ or higher
    ```
 
@@ -659,10 +659,10 @@ class WorkspaceIndexer:
    # Expected: Empty list of containers (no error)
    ```
 
-4. **Validate docker-compose.yml** (root of monorepo)
+4. **Validate docker compose.yml** (root of monorepo)
 
    ```bash
-   docker-compose config > /dev/null && echo "✓ docker-compose.yml is valid"
+   docker compose config > /dev/null && echo "✓ docker compose.yml is valid"
    ```
 
 5. **Test Docker Build** (Dockerfile should exist, may not be fully complete yet)
@@ -685,23 +685,23 @@ open /Applications/Docker.app
 sudo systemctl start docker
 ```
 
-**Problem**: docker-compose not found
+**Problem**: docker compose not found
 **Solution**:
 
 ```bash
 # macOS
-brew install docker-compose
+brew install docker compose
 
 # Linux
-sudo apt install docker-compose
+sudo apt install docker compose
 ```
 
 **Success Criteria**:
 
 - [ ] `docker --version` returns 20.10+
-- [ ] `docker-compose --version` returns 2.0+
+- [ ] `docker compose --version` returns 2.0+
 - [ ] `docker ps` runs without error
-- [ ] `docker-compose config` validates
+- [ ] `docker compose config` validates
 - [ ] Docker daemon running and accessible
 
 ---
@@ -764,7 +764,7 @@ This document captures the exact state of the development environment after Phas
 ### Docker
 
 - Docker Version: [version]
-- docker-compose Version: [version]
+- docker compose Version: [version]
 - Docker Daemon: [running/stopped]
 
 ## Performance Baselines
@@ -824,7 +824,7 @@ This document captures the exact state of the development environment after Phas
 - [x] All transitive dependencies present
 - [x] PostgreSQL running and migrations applied
 - [x] Model download verified (first init 2-5 min, subsequent inits faster)
-- [x] Docker/docker-compose working
+- [x] Docker/docker compose working
 - [x] app/sandbox/ directory structure created
 - [x] app/models/session.py stub created and imports
 - [x] .env.example template created
@@ -920,7 +920,7 @@ echo ""
 # Docker
 echo "[7/8] Docker verification..."
 docker --version > /dev/null && echo "✓ Docker installed" || exit 1
-docker-compose --version > /dev/null && echo "✓ docker-compose installed" || exit 1
+docker compose --version > /dev/null && echo "✓ docker compose installed" || exit 1
 docker ps > /dev/null 2>&1 && echo "✓ Docker daemon running" || exit 1
 echo ""
 
@@ -1000,7 +1000,7 @@ All criteria must be met before Phase 1.1 can begin:
 - [ ] Model download works (first init with model download completes)
 - [ ] PostgreSQL running and migrations applied
 - [ ] All expected database tables created
-- [ ] Docker and docker-compose installed and verified
+- [ ] Docker and docker compose installed and verified
 - [ ] app/sandbox/ directory structure created
 - [ ] app/models/session.py stub created and imports correctly
 
@@ -1138,7 +1138,7 @@ All criteria must be met before Phase 1.1 can begin:
 **Mitigation Strategies**:
 
 1. Document PostgreSQL startup procedure in .env.example
-2. Provide docker-compose.yml with PostgreSQL service (volume-backed)
+2. Provide docker compose.yml with PostgreSQL service (volume-backed)
 3. Include diagnostic script to verify connection
 4. Pre-create database if not exists (migration handles this)
 5. Allow SQLite as fallback for Phase 1.0 verification (switch to Postgres in Phase 1.1)
@@ -1202,7 +1202,7 @@ All criteria must be met before Phase 1.1 can begin:
 ### External Dependencies (Must be installed before Phase 1.0)
 
 - Python 3.12+
-- PostgreSQL 18+
+- PostgreSQL 15+ (16 recommended)
 - Docker (optional for Phase 1.0, required by Phase 1.8)
 - uv package manager
 

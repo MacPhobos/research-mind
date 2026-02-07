@@ -97,7 +97,7 @@ flowchart LR
 | Frontend       | SvelteKit 5, TypeScript | User interface                    |
 | Vector Search  | mcp-vector-search       | Content indexing and retrieval    |
 | Agent Runtime  | claude-mpm              | Agentic question answering        |
-| Metadata Store | PostgreSQL 18           | Sessions, sources, audit logs     |
+| Metadata Store | PostgreSQL 16           | Sessions, sources, audit logs     |
 
 ## Quick Start
 

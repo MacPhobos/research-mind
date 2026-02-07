@@ -53,7 +53,7 @@
 ### Docker (Optional for Phase 1.0)
 
 - **Docker Version**: 29.1.3
-- **docker-compose Version**: 5.0.1
+- **Docker Compose Version**: 5.0.1
 - **Docker Daemon**: Not running (can be started with `open /Applications/Docker.app`)
 - **Note**: Docker not critical for Phase 1.0 core functionality
 
@@ -133,7 +133,7 @@ VECTOR_SEARCH_MODEL=all-MiniLM-L6-v2
 
 ### 1.0.3: PostgreSQL Setup ✓
 
-- PostgreSQL 18.1 running
+- PostgreSQL 16 running
 - Database `research_mind` created and accessible
 - Connection verified
 - User `mac` has access
@@ -165,7 +165,7 @@ VECTOR_SEARCH_MODEL=all-MiniLM-L6-v2
 ### 1.0.7: Docker Verification ✓
 
 - Docker 29.1.3 installed
-- docker-compose 5.0.1 installed
+- Docker Compose 5.0.1 installed
 - Docker daemon not currently running (optional for Phase 1.0)
 - Can be started: `open /Applications/Docker.app`
 - Deferred to Phase 1.8 if needed earlier
@@ -183,7 +183,7 @@ VECTOR_SEARCH_MODEL=all-MiniLM-L6-v2
 ### Issue 1: Docker Daemon Not Running
 
 **Severity**: Low (optional for Phase 1.0)
-**Impact**: Cannot use docker-compose up locally, but can proceed with Phase 1.1-1.7 using local Python
+**Impact**: Cannot use `docker compose up` locally, but can proceed with Phase 1.1-1.7 using local Python
 **Workaround**:
 
 ```bash
@@ -233,11 +233,11 @@ open /Applications/Docker.app
 
 - [x] **PostgreSQL connectivity** - VERIFIED ✓
 
-  - PostgreSQL 18.1 running and accessible
+  - PostgreSQL 16 running and accessible
   - Database created and tested
 
 - [x] **Docker setup** - PARTIAL (optional for Phase 1.0)
-  - Docker and docker-compose installed
+  - Docker and Docker Compose installed
   - Daemon not running but can be started
   - Deferred to Phase 1.8
 
@@ -259,7 +259,7 @@ open /Applications/Docker.app
 - [x] PostgreSQL running and migrations directory ready
 - [x] Database `research_mind` created and accessible
 - [x] Model caching verified (download working, cache persistent)
-- [x] Docker/docker-compose installed (daemon optional for Phase 1.0)
+- [x] Docker/Docker Compose installed (daemon optional for Phase 1.0)
 - [x] app/sandbox/ directory structure created
 - [x] app/models/session.py stub created and imports
 - [x] .env configured with all required variables
@@ -282,7 +282,7 @@ open /Applications/Docker.app
 ### Critical Environment State
 
 - Python 3.12.11 with all required packages installed globally
-- PostgreSQL 18.1 running and ready
+- PostgreSQL 16 running and ready
 - Model cache functional at ~/.cache/huggingface/ (1.2 GB)
 - Database research_mind created and empty (by design)
 

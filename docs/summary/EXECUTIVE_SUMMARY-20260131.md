@@ -43,7 +43,7 @@ research-mind/
 ├── research-mind-service/    # FastAPI backend (Python)
 ├── research-mind-ui/          # SvelteKit frontend (TypeScript)
 ├── docs/                      # Shared documentation
-├── docker-compose.yml         # Local dev environment
+├── Docker Compose.yml         # Local dev environment
 └── Makefile                   # Dev commands
 ```
 
@@ -56,7 +56,7 @@ research-mind/
 | **Vector DB**     | ChromaDB (SQLite)        | Session-scoped embeddings and vector search                 |
 | **Indexing**      | mcp-vector-search        | Code/document parsing, chunking, embedding                  |
 | **Agent Runtime** | claude-mpm               | Multi-agent orchestration for question-answering            |
-| **Database**      | PostgreSQL 18            | Session metadata, audit logs, job tracking                  |
+| **Database**      | PostgreSQL 16            | Session metadata, audit logs, job tracking                  |
 | **Development**   | Docker Compose           | Local development stack (postgres + services)               |
 
 ### Service Ports
@@ -350,7 +350,7 @@ The frontend auto-generates TypeScript types from the backend's OpenAPI schema:
 | 4   | Indexing crashes         | MEDIUM   | Error handling, resume capability                |
 | 5   | ChromaDB corruption      | MEDIUM   | Connection pooling, recovery procedures          |
 | 6   | Agent jailbreak          | MEDIUM   | Infrastructure enforcement, not prompts          |
-| 7   | Deployment complexity    | MEDIUM   | Docker + docker-compose, clear runbooks          |
+| 7   | Deployment complexity    | MEDIUM   | Docker + Docker Compose, clear runbooks          |
 | 8   | Latency too high         | MEDIUM   | Warm pools, caching, incremental indexing        |
 
 **Assessment**: All risks manageable with documented mitigations. None are show-stoppers.

@@ -9,12 +9,6 @@ Common issues encountered during Phase 1.0 environment setup and their solutions
 ### Symptoms
 
 ```
-error: Microsoft Visual C++ 14.0 is required
-```
-
-or
-
-```
 fatal error: Python.h: No such file or directory
 ```
 
@@ -124,7 +118,7 @@ PostgreSQL service not running, incorrect credentials, or database not created.
 2. **Start PostgreSQL** (macOS):
 
    ```bash
-   brew services start postgresql@18
+   brew services start postgresql@16
    ```
 
 3. **Check credentials**:

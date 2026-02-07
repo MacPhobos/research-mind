@@ -7,7 +7,7 @@ Utility scripts for the research-mind project.
 | Script                          | Purpose                                                  |
 | ------------------------------- | -------------------------------------------------------- |
 | `verify-install.sh`             | Verify installation is complete and services are healthy |
-| `docker-entrypoint-combined.sh` | Entrypoint for combined Docker container                 |
+| `docker-entrypoint-combined.sh` | Entrypoint for combined Docker container (placeholder for future single-container deployment -- not yet tested) |
 
 ## Usage
 
