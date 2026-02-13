@@ -1,0 +1,69 @@
+{
+  "version": "1.0.0",
+  "scoring": {
+    "dimensions": [
+      {
+        "name": "accuracy",
+        "scale": [1, 5],
+        "description": "Correctness of the answer relative to source content",
+        "rubric": {
+          "1": "Answer is factually wrong or contradicts source material",
+          "2": "Answer has significant errors or misleading statements",
+          "3": "Answer is mostly correct with minor inaccuracies",
+          "4": "Answer is correct with no significant errors",
+          "5": "Answer is precise, correct, and well-supported by sources"
+        }
+      },
+      {
+        "name": "completeness",
+        "scale": [1, 5],
+        "description": "Whether all relevant information from available sources is included",
+        "rubric": {
+          "1": "Answer is missing most relevant information",
+          "2": "Answer covers less than half of available relevant information",
+          "3": "Answer covers the main points but misses some relevant details",
+          "4": "Answer is thorough with minor omissions",
+          "5": "Answer covers all relevant information from available sources"
+        }
+      },
+      {
+        "name": "citation_quality",
+        "scale": [1, 5],
+        "description": "Proper source attribution with file paths",
+        "rubric": {
+          "1": "No citations or source references provided",
+          "2": "Vague references without specific file paths",
+          "3": "Some citations present but inconsistent or incomplete",
+          "4": "Most claims cited with specific file paths",
+          "5": "All claims properly cited with specific file paths and line references"
+        }
+      },
+      {
+        "name": "response_time",
+        "scale": [1, 5],
+        "description": "Wall-clock time from question to complete answer",
+        "rubric": {
+          "1": "Over 60 seconds",
+          "2": "30-60 seconds",
+          "3": "15-30 seconds",
+          "4": "5-15 seconds",
+          "5": "Under 5 seconds"
+        }
+      }
+    ],
+    "thresholds": {
+      "minimum_per_dimension": 3.0,
+      "minimum_average": 3.5,
+      "regression_tolerance": 0.5,
+      "description": "Quality score must remain within 0.5 points of baseline on every dimension"
+    },
+    "category_weights": {
+      "factual": 1.0,
+      "cross_document": 1.0,
+      "analytical": 1.0,
+      "code": 1.0,
+      "comparison": 1.0,
+      "unanswerable": 1.0
+    }
+  }
+}

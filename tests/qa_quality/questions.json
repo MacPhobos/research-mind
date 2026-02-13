@@ -1,0 +1,174 @@
+{
+  "version": "1.0.0",
+  "description": "Q&A quality test questions for sandbox configuration validation",
+  "categories": [
+    "factual",
+    "cross_document",
+    "analytical",
+    "code",
+    "comparison",
+    "unanswerable"
+  ],
+  "questions": [
+    {
+      "id": "factual_01",
+      "category": "factual",
+      "question": "What port does the research-mind service run on?",
+      "expected_keywords": ["15010"],
+      "expected_sources": ["CLAUDE.md"],
+      "notes": "Direct factual lookup from a single document"
+    },
+    {
+      "id": "factual_02",
+      "category": "factual",
+      "question": "What database does the backend use?",
+      "expected_keywords": ["PostgreSQL", "SQLAlchemy"],
+      "expected_sources": [],
+      "notes": "Basic factual question about technology stack"
+    },
+    {
+      "id": "factual_03",
+      "category": "factual",
+      "question": "What is the API version prefix used by the service?",
+      "expected_keywords": ["/api/v1"],
+      "expected_sources": [],
+      "notes": "Specific technical detail"
+    },
+    {
+      "id": "factual_04",
+      "category": "factual",
+      "question": "What Python version is required for the backend?",
+      "expected_keywords": ["3.12"],
+      "expected_sources": [],
+      "notes": "Version requirement lookup"
+    },
+    {
+      "id": "cross_doc_01",
+      "category": "cross_document",
+      "question": "How do changes to the API contract flow from backend to frontend?",
+      "expected_keywords": ["contract", "api-contract.md", "gen-client", "openapi"],
+      "expected_sources": [],
+      "notes": "Requires synthesizing information from multiple documents"
+    },
+    {
+      "id": "cross_doc_02",
+      "category": "cross_document",
+      "question": "What testing frameworks are used across both the backend and frontend?",
+      "expected_keywords": ["pytest", "vitest"],
+      "expected_sources": [],
+      "notes": "Cross-project synthesis"
+    },
+    {
+      "id": "cross_doc_03",
+      "category": "cross_document",
+      "question": "What CORS configuration is needed for the frontend to communicate with the backend?",
+      "expected_keywords": ["15000", "15010", "CORS_ORIGINS"],
+      "expected_sources": [],
+      "notes": "Requires connecting frontend and backend configuration"
+    },
+    {
+      "id": "analytical_01",
+      "category": "analytical",
+      "question": "Why does the project use a frozen API contract approach?",
+      "expected_keywords": ["contract", "source of truth", "sync", "type safety"],
+      "expected_sources": [],
+      "notes": "Requires reasoning about design decisions"
+    },
+    {
+      "id": "analytical_02",
+      "category": "analytical",
+      "question": "What are the risks of deploying the frontend before the backend when making API changes?",
+      "expected_keywords": ["types", "mismatch", "breaking", "generated"],
+      "expected_sources": [],
+      "notes": "Analytical reasoning about deployment order"
+    },
+    {
+      "id": "analytical_03",
+      "category": "analytical",
+      "question": "Why are database migrations preferred over manual schema changes?",
+      "expected_keywords": ["Alembic", "migration", "history", "rollback"],
+      "expected_sources": [],
+      "notes": "Reasoning about architectural decisions"
+    },
+    {
+      "id": "code_01",
+      "category": "code",
+      "question": "Show an example of how to create a new FastAPI endpoint with Pydantic validation.",
+      "expected_keywords": ["BaseModel", "router", "response_model"],
+      "expected_sources": [],
+      "notes": "Code pattern from documentation"
+    },
+    {
+      "id": "code_02",
+      "category": "code",
+      "question": "How is the database session managed in route handlers?",
+      "expected_keywords": ["Depends", "get_db", "yield"],
+      "expected_sources": [],
+      "notes": "Code pattern: dependency injection"
+    },
+    {
+      "id": "code_03",
+      "category": "code",
+      "question": "What is the error handling pattern for a 404 response?",
+      "expected_keywords": ["HTTPException", "404", "error", "code"],
+      "expected_sources": [],
+      "notes": "Code pattern: error handling"
+    },
+    {
+      "id": "comparison_01",
+      "category": "comparison",
+      "question": "Compare the development setup commands for backend vs frontend.",
+      "expected_keywords": ["uv", "npm", "uvicorn", "vite"],
+      "expected_sources": [],
+      "notes": "Comparison across two projects"
+    },
+    {
+      "id": "comparison_02",
+      "category": "comparison",
+      "question": "What are the differences between major, minor, and patch version bumps for the API?",
+      "expected_keywords": ["breaking", "new endpoints", "bug fix"],
+      "expected_sources": [],
+      "notes": "Comparison of versioning levels"
+    },
+    {
+      "id": "comparison_03",
+      "category": "comparison",
+      "question": "Compare the authentication approach in development vs production.",
+      "expected_keywords": ["stub", "JWT", "not implemented", "production"],
+      "expected_sources": [],
+      "notes": "Compare current state vs planned state"
+    },
+    {
+      "id": "unanswerable_01",
+      "category": "unanswerable",
+      "question": "What is the company's revenue target for Q3 2026?",
+      "expected_keywords": ["not found", "no information", "cannot answer", "not available"],
+      "expected_sources": [],
+      "notes": "Question with no answer in the content. Should decline to answer."
+    },
+    {
+      "id": "unanswerable_02",
+      "category": "unanswerable",
+      "question": "How many users are currently using the research-mind platform?",
+      "expected_keywords": ["not found", "no information", "cannot answer", "not available"],
+      "expected_sources": [],
+      "notes": "Usage statistics not in docs. Should decline to answer."
+    },
+    {
+      "id": "unanswerable_03",
+      "category": "unanswerable",
+      "question": "What is the current stock price of the parent company?",
+      "expected_keywords": ["not found", "no information", "cannot answer", "not available"],
+      "expected_sources": [],
+      "notes": "Completely off-topic. Should decline to answer."
+    },
+    {
+      "id": "unanswerable_04",
+      "category": "unanswerable",
+      "question": "What competitor products were evaluated before choosing FastAPI?",
+      "expected_keywords": ["not found", "no information", "cannot answer", "not available", "not mentioned"],
+      "expected_sources": [],
+      "notes": "Plausible question but answer not in docs. Should decline."
+    }
+  ]
+}
